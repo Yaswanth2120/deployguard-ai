@@ -9,8 +9,9 @@ Current scope is intentionally minimal:
 - Flyway migration support
 - `GET /api/health`
 - Project CRUD APIs
+- Deployment APIs
 
-No deployment, log, CI/CD, AI, frontend, or security logic has been added yet.
+No log, CI/CD, AI, frontend, or security logic has been added yet.
 
 ## Requirements
 
@@ -113,3 +114,40 @@ curl -i -X DELETE http://localhost:8080/api/projects/{project-id}
 ```
 
 Validation failures return `400` with a JSON error response. Missing projects return `404` with a JSON error response.
+
+## Deployment API
+
+Create a deployment:
+
+```sh
+curl -i -X POST http://localhost:8080/api/deployments \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "projectId": "{project-id}",
+    "commitSha": "abc123",
+    "branch": "main",
+    "environment": "production",
+    "status": "SUCCESS",
+    "deployedBy": "yaswanth",
+    "deployedAt": "2026-06-11T12:00:00Z"
+  }'
+```
+
+New deployments default to:
+
+- `riskScore`: `0`
+- `riskLevel`: `LOW`
+
+Get one deployment:
+
+```sh
+curl http://localhost:8080/api/deployments/{deployment-id}
+```
+
+List deployments for a project:
+
+```sh
+curl http://localhost:8080/api/projects/{project-id}/deployments
+```
+
+Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.

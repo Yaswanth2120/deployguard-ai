@@ -1,5 +1,6 @@
 package com.deployguard.api.common.error;
 
+import com.deployguard.api.deployment.DeploymentNotFoundException;
 import com.deployguard.api.project.ProjectNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
@@ -13,9 +14,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ProjectNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleProjectNotFound(
-            ProjectNotFoundException exception,
+    @ExceptionHandler({ProjectNotFoundException.class, DeploymentNotFoundException.class})
+    public ResponseEntity<ApiErrorResponse> handleNotFound(
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
