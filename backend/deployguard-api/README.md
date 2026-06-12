@@ -10,8 +10,9 @@ Current scope is intentionally minimal:
 - `GET /api/health`
 - Project CRUD APIs
 - Deployment APIs
+- Application log ingestion APIs
 
-No log, CI/CD, AI, frontend, or security logic has been added yet.
+No CI/CD, AI, frontend, or security logic has been added yet.
 
 ## Requirements
 
@@ -148,6 +149,57 @@ List deployments for a project:
 
 ```sh
 curl http://localhost:8080/api/projects/{project-id}/deployments
+```
+
+Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.
+
+## Application Log API
+
+Create a log without a deployment:
+
+```sh
+curl -i -X POST http://localhost:8080/api/logs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "projectId": "{project-id}",
+    "serviceName": "deployguard-api",
+    "level": "INFO",
+    "message": "Deployment completed",
+    "timestamp": "2026-06-12T12:00:00Z"
+  }'
+```
+
+Create a log linked to a deployment:
+
+```sh
+curl -i -X POST http://localhost:8080/api/logs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "projectId": "{project-id}",
+    "deploymentId": "{deployment-id}",
+    "serviceName": "deployguard-api",
+    "level": "ERROR",
+    "message": "Request latency exceeded threshold",
+    "timestamp": "2026-06-12T12:05:00Z"
+  }'
+```
+
+List logs for a project:
+
+```sh
+curl http://localhost:8080/api/projects/{project-id}/logs
+```
+
+List logs for a deployment:
+
+```sh
+curl http://localhost:8080/api/deployments/{deployment-id}/logs
+```
+
+List error logs for a project:
+
+```sh
+curl http://localhost:8080/api/projects/{project-id}/logs/errors
 ```
 
 Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.
