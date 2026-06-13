@@ -8,6 +8,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+deployguard:
+  ai-service:
+    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8001}
   jpa:
     hibernate:
       ddl-auto: validate

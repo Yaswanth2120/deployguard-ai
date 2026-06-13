@@ -1,5 +1,6 @@
 package com.deployguard.api.common.error;
 
+import com.deployguard.api.ai.AiServiceUnavailableException;
 import com.deployguard.api.cirun.CiRunNotFoundException;
 import com.deployguard.api.deployment.DeploymentNotFoundException;
 import com.deployguard.api.project.ProjectNotFoundException;
@@ -37,6 +38,14 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(AiServiceUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleAiServiceUnavailable(
+            AiServiceUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

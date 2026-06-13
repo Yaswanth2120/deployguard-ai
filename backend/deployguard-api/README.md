@@ -272,3 +272,38 @@ curl http://localhost:8080/api/projects/{project-id}/logs/errors
 ```
 
 Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.
+## AI Incident Analysis
+
+Run the FastAPI AI service first:
+
+```bash
+cd ../../ai-service
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8001
+```
+
+Run the backend with the AI service URL:
+
+```bash
+AI_SERVICE_BASE_URL=http://localhost:8001 \
+DB_HOST=localhost \
+DB_PORT=5432 \
+DB_NAME=deployguard \
+DB_USERNAME=deployguard \
+DB_PASSWORD=deployguard \
+mvn spring-boot:run
+```
+
+Analyze a deployment:
+
+```bash
+curl -i -X POST http://localhost:8080/api/deployments/{deployment-id}/ai-analysis
+```
+
+Fetch previous AI summaries for a deployment:
+
+```bash
+curl -i http://localhost:8080/api/deployments/{deployment-id}/ai-summaries
+```
+
+The backend sends deployment, related CI runs, deployment logs, `riskScore`, and `riskLevel` to the AI service. If the AI service is unavailable, the backend returns a JSON `502 Bad Gateway` error.
