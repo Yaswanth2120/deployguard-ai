@@ -13,6 +13,14 @@ load_dotenv()
 DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_TIMEOUT_SECONDS = 30.0
+EXPECTED_RESPONSE_KEYS = {
+    "summary",
+    "likelyRootCause",
+    "evidence",
+    "recommendedActions",
+    "severity",
+    "confidence",
+}
 
 
 async def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResponse:
@@ -24,7 +32,7 @@ async def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysis
     try:
         raw_response = await call_openrouter(request, api_key)
         return parse_model_response(raw_response)
-    except (httpx.HTTPError, KeyError, TypeError, ValueError, ValidationError):
+    except (httpx.HTTPError, AttributeError, KeyError, TypeError, ValueError, ValidationError):
         return build_fallback_response(request)
 
 
@@ -84,7 +92,19 @@ def build_user_prompt(request: IncidentAnalysisRequest) -> str:
 
 def parse_model_response(raw_response: str) -> IncidentAnalysisResponse:
     parsed = json.loads(extract_json(raw_response))
+    validate_response_shape(parsed)
     return IncidentAnalysisResponse.model_validate(parsed)
+
+
+def validate_response_shape(parsed: Any) -> None:
+    if not isinstance(parsed, dict):
+        raise ValueError("Model response must be a JSON object.")
+
+    response_keys = set(parsed.keys())
+    if response_keys != EXPECTED_RESPONSE_KEYS:
+        missing = EXPECTED_RESPONSE_KEYS - response_keys
+        extra = response_keys - EXPECTED_RESPONSE_KEYS
+        raise ValueError(f"Model response keys mismatch. Missing: {missing}. Extra: {extra}.")
 
 
 def extract_json(raw_response: str) -> str:
