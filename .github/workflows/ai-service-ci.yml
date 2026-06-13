@@ -1,0 +1,39 @@
+name: AI Service CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: FastAPI Checks
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ai-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile Python files
+        run: python -m compileall app
+
+      - name: Smoke test health endpoint
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8001 &
+          sleep 3
+          curl --fail http://127.0.0.1:8001/health
