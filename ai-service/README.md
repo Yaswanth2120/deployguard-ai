@@ -2,11 +2,23 @@
 
 FastAPI service for deployment incident analysis.
 
-Current status: mock incident analysis only. This service does not call NVIDIA Nemotron, OpenRouter, or any external AI provider yet.
+Current status: OpenRouter integration for NVIDIA Nemotron 3 Ultra with a safe fallback response when the API key is missing, the model call fails, or the model returns invalid JSON.
 
 ## Requirements
 
 - Python 3.11+
+
+## Environment Variables
+
+```bash
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+export OPENROUTER_MODEL="nvidia/nemotron-3-ultra-550b-a55b:free"
+export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+```
+
+Only `OPENROUTER_API_KEY` is required for real AI analysis. The model and base URL have defaults.
+
+You can also create a local `.env` file for development. Do not commit `.env` files or API keys.
 
 ## Setup
 
@@ -42,6 +54,10 @@ Expected response:
 
 ## Analyze Incident
 
+With `OPENROUTER_API_KEY` set, this endpoint calls OpenRouter chat completions using `nvidia/nemotron-3-ultra-550b-a55b:free`.
+
+Without an API key, or if the model call fails, the service returns a deterministic fallback response based on `riskLevel`.
+
 ```bash
 curl -i -X POST http://localhost:8001/analyze-incident \
   -H "Content-Type: application/json" \
@@ -51,15 +67,33 @@ curl -i -X POST http://localhost:8001/analyze-incident \
       "environment": "prod",
       "commitSha": "abc123"
     },
-    "ciRuns": [],
-    "logs": [],
+    "ciRuns": [
+      {
+        "provider": "github-actions",
+        "status": "FAILED",
+        "failedTests": 3
+      }
+    ],
+    "logs": [
+      {
+        "level": "ERROR",
+        "message": "Payment API timeout after deployment"
+      }
+    ],
     "riskScore": 85,
     "riskLevel": "HIGH"
   }'
 ```
 
-The response is currently mocked from `riskLevel`:
+Response shape:
 
-- `LOW`: low severity summary
-- `MEDIUM`: medium severity summary
-- `HIGH`: high severity summary
+```json
+{
+  "summary": "...",
+  "likelyRootCause": "...",
+  "evidence": [],
+  "recommendedActions": [],
+  "severity": "LOW",
+  "confidence": "LOW"
+}
+```

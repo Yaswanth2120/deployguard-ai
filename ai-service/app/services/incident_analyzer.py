@@ -1,7 +1,115 @@
+import json
+import os
+from typing import Any
+
+import httpx
+from dotenv import load_dotenv
+from pydantic import ValidationError
+
 from app.schemas import IncidentAnalysisRequest, IncidentAnalysisResponse
 
+load_dotenv()
 
-def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResponse:
+DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_TIMEOUT_SECONDS = 30.0
+
+
+async def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResponse:
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
+    if not api_key:
+        return build_fallback_response(request)
+
+    try:
+        raw_response = await call_openrouter(request, api_key)
+        return parse_model_response(raw_response)
+    except (httpx.HTTPError, KeyError, TypeError, ValueError, ValidationError):
+        return build_fallback_response(request)
+
+
+async def call_openrouter(request: IncidentAnalysisRequest, api_key: str) -> str:
+    base_url = os.getenv("OPENROUTER_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+    model = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
+
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": build_system_prompt(),
+            },
+            {
+                "role": "user",
+                "content": build_user_prompt(request),
+            },
+        ],
+        "response_format": {"type": "json_object"},
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "X-Title": "DeployGuard AI",
+    }
+
+    async with httpx.AsyncClient(timeout=OPENROUTER_TIMEOUT_SECONDS) as client:
+        response = await client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+
+    return data["choices"][0]["message"]["content"]
+
+
+def build_system_prompt() -> str:
+    return (
+        "You are a senior site reliability engineer analyzing deployment incidents. "
+        "Use only the deployment, CI/CD, log, riskScore, and riskLevel data provided. "
+        "Do not invent facts, services, timelines, metrics, users, or failures. "
+        "If evidence is insufficient, say so clearly. "
+        "Return JSON only with exactly these keys: summary, likelyRootCause, evidence, "
+        "recommendedActions, severity, confidence. "
+        "severity and confidence must each be one of LOW, MEDIUM, HIGH. "
+        "evidence and recommendedActions must be arrays of strings."
+    )
+
+
+def build_user_prompt(request: IncidentAnalysisRequest) -> str:
+    context = request.model_dump(mode="json")
+    return (
+        "Analyze this DeployGuard incident context and return JSON only.\n\n"
+        f"{json.dumps(context, indent=2, sort_keys=True)}"
+    )
+
+
+def parse_model_response(raw_response: str) -> IncidentAnalysisResponse:
+    parsed = json.loads(extract_json(raw_response))
+    return IncidentAnalysisResponse.model_validate(parsed)
+
+
+def extract_json(raw_response: str) -> str:
+    text = raw_response.strip()
+
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    if text.startswith("{") and text.endswith("}"):
+        return text
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("Model response did not contain a JSON object.")
+
+    return text[start : end + 1]
+
+
+def build_fallback_response(request: IncidentAnalysisRequest) -> IncidentAnalysisResponse:
     risk_level = request.riskLevel
 
     if risk_level == "HIGH":

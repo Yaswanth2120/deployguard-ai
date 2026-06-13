@@ -12,5 +12,5 @@ def health() -> HealthResponse:
 
 
 @app.post("/analyze-incident", response_model=IncidentAnalysisResponse)
-def analyze_incident_endpoint(request: IncidentAnalysisRequest) -> IncidentAnalysisResponse:
-    return analyze_incident(request)
+async def analyze_incident_endpoint(request: IncidentAnalysisRequest) -> IncidentAnalysisResponse:
+    return await analyze_incident(request)
