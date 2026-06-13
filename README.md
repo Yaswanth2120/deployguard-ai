@@ -41,3 +41,33 @@ Initial monorepo structure only.
 - Docker Compose placeholder exists for future services.
 - No business logic has been implemented.
 - No API keys or secrets are included.
+
+## Local PostgreSQL
+
+Start PostgreSQL for local development:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres
+```
+
+The Postgres service uses `postgres:16` with `platform: linux/arm64` so it runs cleanly on Apple Silicon.
+
+Verify it is running:
+
+```bash
+docker ps
+nc -zv localhost 5432
+```
+
+Troubleshooting:
+
+```bash
+docker logs deployguard-postgres
+```
+
+If Docker reports an `exec format error`, confirm `infra/docker-compose.yml` uses `image: postgres:16` and `platform: linux/arm64` for the `postgres` service, then recreate the container:
+
+```bash
+docker compose -f infra/docker-compose.yml down
+docker compose -f infra/docker-compose.yml up -d postgres
+```
