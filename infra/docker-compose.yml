@@ -2,10 +2,10 @@
 #
 # Current services:
 # - PostgreSQL: primary relational database
+# - RabbitMQ: asynchronous event queue
 #
 # Future services:
 # - Redis: caching and coordination
-# - RabbitMQ: asynchronous event queue
 # - backend: DeployGuard API service
 # - ai-service: incident analysis service
 # - frontend: web application
@@ -31,6 +31,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: deployguard-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: deployguard
+      RABBITMQ_DEFAULT_PASS: deployguard
+    ports:
+      - "5672:5672"
+      - "15672:15672"
 
 volumes:
   postgres-data:
