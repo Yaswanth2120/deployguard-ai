@@ -11,8 +11,9 @@ Current scope is intentionally minimal:
 - Project CRUD APIs
 - Deployment APIs
 - Application log ingestion APIs
+- CI/CD run APIs
 
-No CI/CD, AI, frontend, or security logic has been added yet.
+No AI, frontend, risk scoring, or security logic has been added yet.
 
 ## Requirements
 
@@ -152,6 +153,49 @@ curl http://localhost:8080/api/projects/{project-id}/deployments
 ```
 
 Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.
+
+## CI/CD Run API
+
+Create a CI run:
+
+```sh
+curl -i -X POST http://localhost:8080/api/ci-runs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "projectId": "{project-id}",
+    "commitSha": "abc123",
+    "provider": "github-actions",
+    "status": "SUCCESS",
+    "durationSeconds": 120,
+    "failedTests": 0
+  }'
+```
+
+Get one CI run:
+
+```sh
+curl http://localhost:8080/api/ci-runs/{ci-run-id}
+```
+
+List CI runs for a project:
+
+```sh
+curl http://localhost:8080/api/projects/{project-id}/ci-runs
+```
+
+List failed CI runs for a project:
+
+```sh
+curl http://localhost:8080/api/projects/{project-id}/ci-runs/failed
+```
+
+List CI runs for a commit:
+
+```sh
+curl http://localhost:8080/api/projects/{project-id}/ci-runs/commit/{commit-sha}
+```
+
+Validation failures return `400` with a JSON error response. Missing projects or CI runs return `404` with a JSON error response.
 
 ## Application Log API
 

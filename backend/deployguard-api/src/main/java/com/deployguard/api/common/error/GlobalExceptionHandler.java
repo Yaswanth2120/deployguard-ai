@@ -1,5 +1,6 @@
 package com.deployguard.api.common.error;
 
+import com.deployguard.api.cirun.CiRunNotFoundException;
 import com.deployguard.api.deployment.DeploymentNotFoundException;
 import com.deployguard.api.project.ProjectNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,9 +15,25 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({ProjectNotFoundException.class, DeploymentNotFoundException.class})
-    public ResponseEntity<ApiErrorResponse> handleNotFound(
-            RuntimeException exception,
+    @ExceptionHandler(ProjectNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleProjectNotFound(
+            ProjectNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(DeploymentNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleDeploymentNotFound(
+            DeploymentNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(CiRunNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleCiRunNotFound(
+            CiRunNotFoundException exception,
             HttpServletRequest request
     ) {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
