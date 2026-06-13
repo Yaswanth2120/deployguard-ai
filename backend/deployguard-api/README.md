@@ -12,8 +12,9 @@ Current scope is intentionally minimal:
 - Deployment APIs
 - Application log ingestion APIs
 - CI/CD run APIs
+- Deployment risk scoring
 
-No AI, frontend, risk scoring, or security logic has been added yet.
+No AI, frontend, queue, Redis, or security logic has been added yet.
 
 ## Requirements
 
@@ -153,6 +154,30 @@ curl http://localhost:8080/api/projects/{project-id}/deployments
 ```
 
 Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.
+
+## Deployment Risk Scoring
+
+Recalculate risk for a deployment:
+
+```sh
+curl -i -X POST http://localhost:8080/api/deployments/{deployment-id}/risk-score/recalculate
+```
+
+Risk scoring rules:
+
+- Failed CI run for the same project and commit: `+30`
+- Related CI run with failed tests: `+20`
+- `ERROR` logs linked to the deployment: `+30`
+- Branch contains `hotfix`: `+10`
+- Environment is `production` or `prod`: `+10`
+
+Scores are capped at `100`.
+
+Risk levels:
+
+- `0` to `30`: `LOW`
+- `31` to `70`: `MEDIUM`
+- `71` to `100`: `HIGH`
 
 ## CI/CD Run API
 

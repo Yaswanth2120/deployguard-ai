@@ -80,6 +80,12 @@ public class Deployment {
         this.riskLevel = "LOW";
     }
 
+    public void updateRisk(Integer riskScore, String riskLevel) {
+        this.riskScore = riskScore;
+        this.riskLevel = riskLevel;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     @PrePersist
     void prePersist() {
         OffsetDateTime now = OffsetDateTime.now();

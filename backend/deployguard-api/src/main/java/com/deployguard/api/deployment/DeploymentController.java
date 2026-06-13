@@ -2,6 +2,7 @@ package com.deployguard.api.deployment;
 
 import com.deployguard.api.deployment.dto.CreateDeploymentRequest;
 import com.deployguard.api.deployment.dto.DeploymentResponse;
+import com.deployguard.api.risk.RiskScoringService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -19,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class DeploymentController {
 
     private final DeploymentService deploymentService;
+    private final RiskScoringService riskScoringService;
 
-    public DeploymentController(DeploymentService deploymentService) {
+    public DeploymentController(DeploymentService deploymentService, RiskScoringService riskScoringService) {
         this.deploymentService = deploymentService;
+        this.riskScoringService = riskScoringService;
     }
 
     @PostMapping("/deployments")
@@ -42,5 +45,10 @@ public class DeploymentController {
     @GetMapping("/projects/{projectId}/deployments")
     public List<DeploymentResponse> getDeploymentsByProjectId(@PathVariable UUID projectId) {
         return deploymentService.getDeploymentsByProjectId(projectId);
+    }
+
+    @PostMapping("/deployments/{deploymentId}/risk-score/recalculate")
+    public DeploymentResponse recalculateRiskScore(@PathVariable UUID deploymentId) {
+        return riskScoringService.calculateAndUpdateRiskScore(deploymentId);
     }
 }
