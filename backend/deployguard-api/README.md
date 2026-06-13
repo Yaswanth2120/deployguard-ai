@@ -274,7 +274,20 @@ curl http://localhost:8080/api/projects/{project-id}/logs/errors
 Validation failures return `400` with a JSON error response. Missing projects or deployments return `404` with a JSON error response.
 ## AI Incident Analysis
 
-Run the FastAPI AI service first:
+Run PostgreSQL and RabbitMQ:
+
+```bash
+cd ../..
+docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
+```
+
+RabbitMQ management UI:
+
+- URL: http://localhost:15672
+- Username: `deployguard`
+- Password: `deployguard`
+
+Run the FastAPI AI service:
 
 ```bash
 cd ../../ai-service
@@ -291,13 +304,35 @@ DB_PORT=5432 \
 DB_NAME=deployguard \
 DB_USERNAME=deployguard \
 DB_PASSWORD=deployguard \
+RABBITMQ_HOST=localhost \
+RABBITMQ_PORT=5672 \
+RABBITMQ_USERNAME=deployguard \
+RABBITMQ_PASSWORD=deployguard \
 mvn spring-boot:run
 ```
 
-Analyze a deployment:
+Analyze a deployment synchronously:
 
 ```bash
 curl -i -X POST http://localhost:8080/api/deployments/{deployment-id}/ai-analysis
+```
+
+Queue an async AI analysis job:
+
+```bash
+curl -i -X POST http://localhost:8080/api/deployments/{deployment-id}/ai-analysis/jobs
+```
+
+Fetch an async job:
+
+```bash
+curl -i http://localhost:8080/api/ai-analysis/jobs/{job-id}
+```
+
+Fetch async jobs for a deployment:
+
+```bash
+curl -i http://localhost:8080/api/deployments/{deployment-id}/ai-analysis/jobs
 ```
 
 Fetch previous AI summaries for a deployment:

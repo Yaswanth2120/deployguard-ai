@@ -1,6 +1,8 @@
 package com.deployguard.api.common.error;
 
 import com.deployguard.api.ai.AiServiceUnavailableException;
+import com.deployguard.api.ai.job.AiAnalysisJobNotFoundException;
+import com.deployguard.api.ai.job.AiAnalysisJobPublishException;
 import com.deployguard.api.cirun.CiRunNotFoundException;
 import com.deployguard.api.deployment.DeploymentNotFoundException;
 import com.deployguard.api.project.ProjectNotFoundException;
@@ -43,6 +45,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AiServiceUnavailableException.class)
     public ResponseEntity<ApiErrorResponse> handleAiServiceUnavailable(
             AiServiceUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(AiAnalysisJobNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleAiAnalysisJobNotFound(
+            AiAnalysisJobNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(AiAnalysisJobPublishException.class)
+    public ResponseEntity<ApiErrorResponse> handleAiAnalysisJobPublishFailure(
+            AiAnalysisJobPublishException exception,
             HttpServletRequest request
     ) {
         return buildResponse(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
