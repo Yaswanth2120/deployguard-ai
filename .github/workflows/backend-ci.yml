@@ -1,0 +1,50 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Maven Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: deployguard
+          POSTGRES_USER: deployguard
+          POSTGRES_PASSWORD: deployguard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U deployguard -d deployguard"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: deployguard
+      DB_USERNAME: deployguard
+      DB_PASSWORD: deployguard
+      AI_SERVICE_BASE_URL: http://localhost:8001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run backend tests
+        working-directory: backend/deployguard-api
+        run: mvn test
