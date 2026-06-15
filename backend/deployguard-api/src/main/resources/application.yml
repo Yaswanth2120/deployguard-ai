@@ -17,6 +17,8 @@ spring:
 deployguard:
   ai-service:
     base-url: ${AI_SERVICE_BASE_URL:http://localhost:8001}
+  cors:
+    allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
   jpa:
     hibernate:
       ddl-auto: validate
