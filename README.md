@@ -8,6 +8,8 @@ Future AI-assisted incident summaries are planned to use NVIDIA Nemotron 3 Ultra
 
 For complete local setup instructions, see [docs/local-development.md](docs/local-development.md).
 
+For OpenRouter/NVIDIA Nemotron configuration and AI smoke testing, see [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md).
+
 The short path for an already configured machine is:
 
 ```bash
