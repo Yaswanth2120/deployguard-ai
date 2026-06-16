@@ -4,6 +4,18 @@ DeployGuard AI is an AI-powered deployment risk and incident analysis platform. 
 
 Future AI-assisted incident summaries are planned to use NVIDIA Nemotron 3 Ultra.
 
+## Quick Start
+
+For complete local setup instructions, see [docs/local-development.md](docs/local-development.md).
+
+The short path for an already configured machine is:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
+```
+
+Then start the AI service, backend, and frontend in separate terminals using the commands in the local development runbook.
+
 ## Folder Structure
 
 ```text
@@ -20,26 +32,22 @@ deployguard-ai/
 
 ## Tech Stack
 
-Planned stack:
-
 - Backend API: Spring Boot
 - AI service: FastAPI
 - Frontend: Next.js
 - Data store: PostgreSQL
-- Cache / queue support: Redis and RabbitMQ
+- Queue support: RabbitMQ
+- Future cache support: Redis
 - Infrastructure: Docker Compose for local development
 - Future model integration: NVIDIA Nemotron 3 Ultra
 
-No application framework code has been generated yet.
-
 ## Current Status
 
-Initial monorepo structure only.
-
-- Required folders have been created.
-- Documentation placeholders have been added.
-- Docker Compose placeholder exists for future services.
-- No business logic has been implemented.
+- Spring Boot backend includes Projects, Deployments, CI runs, application logs, risk scoring, and AI analysis job APIs.
+- FastAPI AI service includes incident analysis with OpenRouter support and safe fallback behavior.
+- Next.js frontend includes a local dashboard connected to backend APIs.
+- Docker Compose runs PostgreSQL and RabbitMQ for local development.
+- Demo data can be created with `./scripts/seed-demo.sh`.
 - No API keys or secrets are included.
 
 ## Local PostgreSQL
