@@ -10,6 +10,8 @@ For complete local setup instructions, see [docs/local-development.md](docs/loca
 
 For OpenRouter/NVIDIA Nemotron configuration and AI smoke testing, see [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md).
 
+For environment variables and secret-handling guidance, see [docs/configuration.md](docs/configuration.md) and [docs/security-notes.md](docs/security-notes.md).
+
 The short path for an already configured machine is:
 
 ```bash

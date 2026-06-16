@@ -3,6 +3,9 @@ target/
 .vscode/
 .DS_Store
 .env
+ai-service/.env
+backend/deployguard-api/.env
+frontend/.env
 *.log
 
 node_modules/
