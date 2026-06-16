@@ -71,3 +71,62 @@ If Docker reports an `exec format error`, confirm `infra/docker-compose.yml` use
 docker compose -f infra/docker-compose.yml down
 docker compose -f infra/docker-compose.yml up -d postgres
 ```
+
+## Local Demo Data
+
+Use the demo seed script to create realistic local data for the frontend dashboard.
+
+Start local infrastructure from the repository root:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
+```
+
+Start the backend:
+
+```bash
+cd backend/deployguard-api
+DB_HOST=localhost \
+DB_PORT=5432 \
+DB_NAME=deployguard \
+DB_USERNAME=deployguard \
+DB_PASSWORD=deployguard \
+AI_SERVICE_BASE_URL=http://localhost:8001 \
+RABBITMQ_HOST=localhost \
+RABBITMQ_PORT=5672 \
+RABBITMQ_USERNAME=deployguard \
+RABBITMQ_PASSWORD=deployguard \
+mvn spring-boot:run
+```
+
+Start the AI service in a separate terminal. `OPENROUTER_API_KEY` is optional for local demo data because the AI service can return a fallback response.
+
+```bash
+cd ai-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+```
+
+Start the frontend in another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Seed demo data from the repository root:
+
+```bash
+./scripts/seed-demo.sh
+```
+
+Override the backend URL when needed:
+
+```bash
+BACKEND_URL=http://localhost:8080 ./scripts/seed-demo.sh
+```
+
+The script creates one project, one high-risk production deployment, one failed CI run, one `ERROR` application log, recalculates risk, and queues an async AI analysis job. It prints the created `PROJECT_ID`, `DEPLOYMENT_ID`, `JOB_ID`, and frontend URLs for viewing the seeded data.
