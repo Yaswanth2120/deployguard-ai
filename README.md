@@ -18,6 +18,10 @@ docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
 
 Then start the AI service, backend, and frontend in separate terminals using the commands in the local development runbook.
 
+## Architecture
+
+For system diagrams, component responsibilities, reliability behavior, scaling notes, and roadmap, see [docs/system-design.md](docs/system-design.md).
+
 ## Folder Structure
 
 ```text
