@@ -8,6 +8,8 @@ Future AI-assisted incident summaries are planned to use NVIDIA Nemotron 3 Ultra
 
 For complete local setup instructions, see [docs/local-development.md](docs/local-development.md).
 
+For complete local demo workflow validation, see [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md).
+
 For OpenRouter/NVIDIA Nemotron configuration and AI smoke testing, see [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md).
 
 For environment variables and secret-handling guidance, see [docs/configuration.md](docs/configuration.md) and [docs/security-notes.md](docs/security-notes.md).
