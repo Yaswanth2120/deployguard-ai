@@ -10,7 +10,7 @@ export function RiskBadge({ level }: { level: RiskLevel | string }) {
   const style = styles[level as RiskLevel] ?? styles.LOW;
 
   return (
-    <span className={`inline-flex items-center rounded border px-2 py-1 text-xs font-semibold ${style}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded border px-2 py-1 text-xs font-semibold ${style}`}>
       {level}
     </span>
   );
