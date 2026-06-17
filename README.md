@@ -32,11 +32,6 @@ DeployGuard AI brings deployment, CI, and log signals into one data model and la
 
 
 ## Major Features
-=======
-For complete local demo workflow validation, see [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md).
-
-For OpenRouter/NVIDIA Nemotron configuration and AI smoke testing, see [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md).
-
 
 - **Deterministic risk engine.** Each deployment is scored from explicit, additive rules (see [Risk Scoring](#risk-scoring)). The same inputs always produce the same score, capped at 100 and mapped to `LOW` / `MEDIUM` / `HIGH`. No model is involved in the score itself.
 - **Synchronous AI analysis.** `POST /api/deployments/{id}/ai-analysis` loads the deployment, project, related CI runs, and logs, calls the AI service inline, stores the summary, and returns it. Best when the caller wants an answer immediately and can tolerate the model latency.
@@ -78,10 +73,8 @@ For system diagrams (high-level architecture, synchronous and asynchronous AI fl
 ## Quick Start
 
 Full setup is in the [local development runbook](docs/local-development.md). The short version:
-=======
-For production container build and deployment preparation, see [docs/deployment.md](docs/deployment.md).
 
-The short path for an already configured machine is:
+For production container build and deployment preparation, see [docs/deployment.md](docs/deployment.md).
 
 ```bash
 # 1. Start infrastructure
@@ -99,23 +92,24 @@ Seed realistic demo data from the repository root:
 See:
 
 - [docs/local-development.md](docs/local-development.md) — complete local stack runbook
+- [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md) — full local demo workflow validation
+- [docs/deployment.md](docs/deployment.md) — production container build and deployment preparation
 - [docs/configuration.md](docs/configuration.md) — environment variables and safe-vs-secret guidance
 - [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md) — OpenRouter/Nemotron configuration and AI smoke testing
 - [docs/security-notes.md](docs/security-notes.md) — secret-handling notes
 
 ## End-to-End Validation
 
-<!-- PLACEHOLDER: An automated end-to-end validation walkthrough/script is not part of this branch yet.
-     When the E2E validation work is merged, link the validation runbook and sample output here. -->
+Use [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md) to validate the complete local demo workflow with `scripts/validate-demo.sh`. The validation covers infrastructure checks, backend and AI service health, frontend reachability, seeded demo data, risk scoring, synchronous AI analysis, asynchronous AI job completion, and stored incident summaries.
 
-_An end-to-end validation runbook and sample output are not available yet. This section will link the validation steps and expected output once that work is merged._ For now, the manual local verification path is the test-and-checks step in the [local development runbook](docs/local-development.md#6-run-tests-and-checks), plus the AI smoke test in [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md).
+The validator does not require a real OpenRouter key because the AI service fallback response is valid for the local demo workflow.
 
 ## Hosted Deployment
 
 <!-- PLACEHOLDER: There is no hosted deployment yet. When a demo environment is deployed,
      add the frontend, backend, and AI service URLs here. Do not invent URLs. -->
 
-_There is no hosted demo environment yet, so no deployment URLs are published._ The project runs locally via Docker Compose and the [local development runbook](docs/local-development.md). Hosted deployment is on the [roadmap](docs/system-design.md#future-roadmap).
+_There is no hosted demo environment yet, so no deployment URLs are published._ The project runs locally via Docker Compose and the [local development runbook](docs/local-development.md). Container build and deployment preparation steps are documented in [docs/deployment.md](docs/deployment.md). Hosted deployment is on the [roadmap](docs/system-design.md#future-roadmap).
 
 ## Known Limitations
 
