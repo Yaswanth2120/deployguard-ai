@@ -12,6 +12,8 @@ For OpenRouter/NVIDIA Nemotron configuration and AI smoke testing, see [docs/ope
 
 For environment variables and secret-handling guidance, see [docs/configuration.md](docs/configuration.md) and [docs/security-notes.md](docs/security-notes.md).
 
+For production container build and deployment preparation, see [docs/deployment.md](docs/deployment.md).
+
 The short path for an already configured machine is:
 
 ```bash
