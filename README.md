@@ -30,7 +30,13 @@ DeployGuard AI brings deployment, CI, and log signals into one data model and la
 1. A **deterministic risk engine** that scores each deployment from concrete signals, so the score is explainable and repeatable.
 2. An **AI incident-analysis service** that produces a structured summary (root cause, evidence, recommended actions, severity, confidence) and falls back to a deterministic response when the model is unavailable.
 
+
 ## Major Features
+=======
+For complete local demo workflow validation, see [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md).
+
+For OpenRouter/NVIDIA Nemotron configuration and AI smoke testing, see [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md).
+
 
 - **Deterministic risk engine.** Each deployment is scored from explicit, additive rules (see [Risk Scoring](#risk-scoring)). The same inputs always produce the same score, capped at 100 and mapped to `LOW` / `MEDIUM` / `HIGH`. No model is involved in the score itself.
 - **Synchronous AI analysis.** `POST /api/deployments/{id}/ai-analysis` loads the deployment, project, related CI runs, and logs, calls the AI service inline, stores the summary, and returns it. Best when the caller wants an answer immediately and can tolerate the model latency.
@@ -38,6 +44,7 @@ DeployGuard AI brings deployment, CI, and log signals into one data model and la
 - **OpenRouter / NVIDIA Nemotron integration.** The FastAPI service calls OpenRouter (configured for an NVIDIA Nemotron model) for incident analysis, asking for JSON only and validating the response shape before saving.
 - **Fallback behavior.** The AI service returns a deterministic fallback summary keyed to the deployment's risk level whenever `OPENROUTER_API_KEY` is missing, OpenRouter errors, the request times out, or the model returns JSON that does not match the expected schema. The platform stays usable with no API key.
 - **Frontend dashboard.** A Next.js dashboard with a project list, deployment list, deployment detail pages, risk badges, and actions to recalculate risk and trigger AI analysis.
+
 
 ## Risk Scoring
 
@@ -71,6 +78,10 @@ For system diagrams (high-level architecture, synchronous and asynchronous AI fl
 ## Quick Start
 
 Full setup is in the [local development runbook](docs/local-development.md). The short version:
+=======
+For production container build and deployment preparation, see [docs/deployment.md](docs/deployment.md).
+
+The short path for an already configured machine is:
 
 ```bash
 # 1. Start infrastructure
