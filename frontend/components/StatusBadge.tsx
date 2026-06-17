@@ -14,7 +14,7 @@ const styles: Record<string, string> = {
 
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center rounded border px-2 py-1 text-xs font-semibold ${styles[status] ?? styles.PENDING}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded border px-2 py-1 text-xs font-semibold ${styles[status] ?? styles.PENDING}`}>
       {status.replace("_", " ")}
     </span>
   );
