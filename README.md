@@ -1,195 +1,154 @@
 # DeployGuard AI
 
-DeployGuard AI is a deployment risk and incident-analysis platform. It correlates deployment events, CI/CD results, and application logs to produce a deterministic risk score for each deployment, and it generates AI-assisted incident summaries through a dedicated analysis service with safe fallback behavior.
+**AI-powered deployment risk detection and incident analysis for modern DevOps teams.**
 
-The project is built as a small, inspectable monorepo: a Spring Boot backend, a FastAPI AI service, a Next.js dashboard, PostgreSQL for storage, and RabbitMQ for asynchronous AI work.
+DeployGuard AI correlates deployments, CI/CD runs, and application logs to detect risky releases before they become incidents. It combines a deterministic risk-scoring engine with an AI incident-analysis service, a RabbitMQ async workflow, and a Next.js dashboard.
 
-> Status: This is a working local-first project. There is no hosted production deployment, no authentication, and no multi-tenancy yet. See [Known Limitations](#known-limitations) for the honest scope.
+## Live Demo
 
-## For Recruiters and Engineers
-
-If you are evaluating this project, start here:
-
-- **[docs/interview-guide.md](docs/interview-guide.md)** — 30-second, two-minute, and five-minute walkthroughs, design rationale, trade-offs, and likely interview questions with truthful answers.
-- **[docs/resume-bullets.md](docs/resume-bullets.md)** — resume bullets, LinkedIn and GitHub descriptions, and STAR-style examples.
-- **[docs/system-design.md](docs/system-design.md)** — architecture diagrams, component responsibilities, reliability behavior, and scaling notes.
-- **[docs/screenshot-checklist.md](docs/screenshot-checklist.md)** — what to capture for a portfolio walkthrough.
-
-## The Problem
-
-**Business problem.** When a deployment causes an incident, teams lose time figuring out *which* change is risky and *why* a service is failing. The signal is spread across CI results, deployment history, and application logs, and is usually pieced together by hand under pressure.
-
-**Technical problem.** Those signals live in different systems and formats. There is no single, consistent view that ties a specific deployed commit to its CI outcome, its error logs, and a structured assessment of how risky it is.
-
-**Target users.** Developers and operators who ship application services and want a faster read on release risk and a quicker first-pass explanation when something breaks.
-
-## The Solution
-
-DeployGuard AI brings deployment, CI, and log signals into one data model and layers two capabilities on top:
-
-1. A **deterministic risk engine** that scores each deployment from concrete signals, so the score is explainable and repeatable.
-2. An **AI incident-analysis service** that produces a structured summary (root cause, evidence, recommended actions, severity, confidence) and falls back to a deterministic response when the model is unavailable.
-
-
-## Major Features
-
-- **Deterministic risk engine.** Each deployment is scored from explicit, additive rules (see [Risk Scoring](#risk-scoring)). The same inputs always produce the same score, capped at 100 and mapped to `LOW` / `MEDIUM` / `HIGH`. No model is involved in the score itself.
-- **Synchronous AI analysis.** `POST /api/deployments/{id}/ai-analysis` loads the deployment, project, related CI runs, and logs, calls the AI service inline, stores the summary, and returns it. Best when the caller wants an answer immediately and can tolerate the model latency.
-- **Asynchronous AI analysis via RabbitMQ.** `POST /api/deployments/{id}/ai-analysis/jobs` inserts a job row, publishes a message to RabbitMQ, and returns immediately. A Spring Boot consumer processes the job, writes the summary, and updates job status. Clients poll `GET /api/ai-analysis/jobs/{jobId}`. Better for longer-running analysis and future scaling.
-- **OpenRouter / NVIDIA Nemotron integration.** The FastAPI service calls OpenRouter (configured for an NVIDIA Nemotron model) for incident analysis, asking for JSON only and validating the response shape before saving.
-- **Fallback behavior.** The AI service returns a deterministic fallback summary keyed to the deployment's risk level whenever `OPENROUTER_API_KEY` is missing, OpenRouter errors, the request times out, or the model returns JSON that does not match the expected schema. The platform stays usable with no API key.
-- **Frontend dashboard.** A Next.js dashboard with a project list, deployment list, deployment detail pages, risk badges, and actions to recalculate risk and trigger AI analysis.
-
-
-## Risk Scoring
-
-The risk engine ([RiskScoringService.java](backend/deployguard-api/src/main/java/com/deployguard/api/risk/RiskScoringService.java)) adds points for each risk signal tied to a deployment's commit and environment:
-
-| Signal | Points |
+| Service | URL |
 | --- | --- |
-| A related CI run has status `FAILED` | +30 |
-| A related CI run has more than zero failed tests | +20 |
-| An `ERROR`-level application log is linked to the deployment | +30 |
-| The deployment branch name contains `hotfix` | +10 |
-| The deployment targets `production` / `prod` | +10 |
+| Frontend dashboard | https://deployguard-ai-coral.vercel.app/ |
+| Backend API | https://deployguard-api-production.up.railway.app |
+| AI service | https://deployguard-ai-production.up.railway.app |
 
-The score is capped at 100. Risk level is `LOW` for scores ≤ 30, `MEDIUM` for 31–70, and `HIGH` above 70.
+> The hosted demo is a portfolio deployment, not a production SaaS environment. Authentication, multi-tenancy, distributed tracing, and retry/DLQ behavior are not implemented yet.
 
-## Technology Stack
+## Recruiter Quick Links
 
-- **Backend API:** Spring Boot 3.5 (Java 21) — REST, validation, JPA, Flyway, RabbitMQ integration
-- **AI service:** FastAPI (Python 3.12) with `httpx` and `pydantic`
-- **Frontend:** Next.js 15 / React 19 / TypeScript 5
-- **Database:** PostgreSQL 16, schema managed by Flyway migrations (`V1`–`V7`)
-- **Message broker:** RabbitMQ 3 (management image)
-- **Model provider:** OpenRouter, configured for an NVIDIA Nemotron model
-- **Local infrastructure:** Docker Compose
-- **Planned, not implemented:** Redis caching
+- [Interview guide](docs/interview-guide.md) — short walkthroughs, design rationale, trade-offs, and likely questions.
+- [Resume bullets](docs/resume-bullets.md) — concise and detailed resume-ready project bullets.
+- [System design](docs/system-design.md) — architecture diagrams, data model, reliability behavior, and scaling notes.
+- [Deployment guide](docs/deployment.md) — Railway/Vercel deployment configuration and container build notes.
+- [E2E demo validation](docs/e2e-demo-validation.md) — local validation script and expected checks.
 
-## Architecture
+## Problem
 
-For system diagrams (high-level architecture, synchronous and asynchronous AI flows), component responsibilities, the data model, reliability behavior, scaling notes, and roadmap, see [docs/system-design.md](docs/system-design.md). A shorter overview is in [docs/architecture.md](docs/architecture.md).
+Deployment incidents are hard to triage quickly because the useful signals are scattered:
 
-## Quick Start
+- CI failures live in one system.
+- Deployment metadata lives somewhere else.
+- Error logs are separate from the deployed commit.
+- Incident summaries often require manual investigation under pressure.
 
-Full setup is in the [local development runbook](docs/local-development.md). The short version:
+DeployGuard AI creates a single workflow for answering: **what changed, how risky is it, what evidence supports that risk, and what should the team do next?**
 
-For production container build and deployment preparation, see [docs/deployment.md](docs/deployment.md).
+## Solution Overview
 
-```bash
-# 1. Start infrastructure
-docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
+DeployGuard AI models projects, deployments, CI runs, and application logs in PostgreSQL. The Spring Boot backend computes an explainable deployment risk score from deterministic rules, then sends the same deployment context to a FastAPI AI service for structured incident analysis. AI analysis can run synchronously or asynchronously through RabbitMQ jobs.
+
+The AI service integrates with OpenRouter/NVIDIA Nemotron when an API key is configured. If the model call fails, times out, returns invalid JSON, or no API key exists, the service returns a deterministic fallback response with the same schema.
+
+## Key Features
+
+- **Deployment risk scoring:** deterministic score from failed CI, failed tests, ERROR logs, hotfix branches, and production deploys.
+- **Incident context model:** projects, deployments, CI/CD runs, application logs, AI summaries, and async jobs stored in PostgreSQL.
+- **Synchronous AI analysis:** immediate incident summary with root cause, evidence, recommended actions, severity, and confidence.
+- **Asynchronous AI jobs:** RabbitMQ-backed queue with `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` job states.
+- **Safe AI fallback:** valid response returned even when OpenRouter is unavailable or unconfigured.
+- **Next.js dashboard:** project list, deployment list, deployment detail view, risk badges, AI summaries, and job status.
+- **Demo automation:** seed script and validation script create and verify realistic demo data.
+- **Hosted portfolio deployment:** frontend on Vercel; backend, AI service, PostgreSQL, and RabbitMQ on Railway.
+
+## Architecture Overview
+
+```mermaid
+flowchart LR
+    user["Developer / Recruiter"] --> frontend["Next.js Dashboard<br/>Vercel"]
+    frontend --> backend["Spring Boot API<br/>Railway"]
+    backend --> postgres[("PostgreSQL<br/>Railway")]
+    backend --> rabbit["RabbitMQ<br/>Railway"]
+    rabbit --> worker["AI Analysis Worker<br/>Spring Boot Consumer"]
+    worker --> ai["FastAPI AI Service<br/>Railway"]
+    backend --> ai
+    ai --> openrouter["OpenRouter"]
+    openrouter --> nemotron["NVIDIA Nemotron"]
 ```
 
-Then, in separate terminals, start the AI service, backend, and frontend using the commands in [docs/local-development.md](docs/local-development.md). `OPENROUTER_API_KEY` is optional — without it, the AI service runs in fallback mode.
+Detailed diagrams are in [docs/system-design.md](docs/system-design.md).
 
-Seed realistic demo data from the repository root:
+## Tech Stack
 
-```bash
-./scripts/seed-demo.sh
-```
+| Layer | Technology | Purpose |
+| --- | --- | --- |
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS | Dashboard and deployment detail UI |
+| Backend | Spring Boot 3.5, Java 21, Maven | REST APIs, risk scoring, orchestration, async worker |
+| AI service | FastAPI, Python 3.12, Pydantic, httpx | OpenRouter/Nemotron call and fallback incident analysis |
+| Database | PostgreSQL 16 | Projects, deployments, CI runs, logs, summaries, jobs |
+| Migrations | Flyway | Versioned database schema changes |
+| Queue | RabbitMQ | Async AI analysis job processing |
+| Local infra | Docker Compose | PostgreSQL and RabbitMQ for local development |
+| Hosting | Railway, Vercel | Hosted demo deployment |
 
-See:
+## System Workflow
 
-- [docs/local-development.md](docs/local-development.md) — complete local stack runbook
-- [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md) — full local demo workflow validation
-- [docs/deployment.md](docs/deployment.md) — production container build and deployment preparation
-- [docs/configuration.md](docs/configuration.md) — environment variables and safe-vs-secret guidance
-- [docs/openrouter-nemotron.md](docs/openrouter-nemotron.md) — OpenRouter/Nemotron configuration and AI smoke testing
-- [docs/security-notes.md](docs/security-notes.md) — secret-handling notes
+1. A project is created with a repository URL and service name.
+2. A deployment is recorded with commit SHA, branch, environment, status, and deployer.
+3. CI/CD run data is ingested for the project and commit.
+4. Application logs are ingested and optionally linked to the deployment.
+5. The backend recalculates risk from deterministic rules.
+6. The frontend displays the deployment, risk score, CI signals, logs, AI summaries, and job history.
 
-## End-to-End Validation
+## AI Analysis Workflow
 
-Use [docs/e2e-demo-validation.md](docs/e2e-demo-validation.md) to validate the complete local demo workflow with `scripts/validate-demo.sh`. The validation covers infrastructure checks, backend and AI service health, frontend reachability, seeded demo data, risk scoring, synchronous AI analysis, asynchronous AI job completion, and stored incident summaries.
+### Synchronous
 
-The validator does not require a real OpenRouter key because the AI service fallback response is valid for the local demo workflow.
+1. Client calls `POST /api/deployments/{deploymentId}/ai-analysis`.
+2. Backend loads deployment, project, CI runs, and logs.
+3. Backend calls the FastAPI AI service.
+4. AI service calls OpenRouter/Nemotron or returns fallback.
+5. Backend stores the AI incident summary and returns it.
 
-## Hosted Deployment
+### Asynchronous
 
-<!-- PLACEHOLDER: There is no hosted deployment yet. When a demo environment is deployed,
-     add the frontend, backend, and AI service URLs here. Do not invent URLs. -->
+1. Client calls `POST /api/deployments/{deploymentId}/ai-analysis/jobs`.
+2. Backend creates an `ai_analysis_jobs` row with `PENDING` status.
+3. Backend publishes a RabbitMQ message.
+4. Spring Boot worker marks the job `PROCESSING`.
+5. Worker calls the same AI analysis flow.
+6. Worker stores the summary and marks the job `COMPLETED`, or stores an error and marks it `FAILED`.
+7. Client polls `GET /api/ai-analysis/jobs/{jobId}`.
 
-_There is no hosted demo environment yet, so no deployment URLs are published._ The project runs locally via Docker Compose and the [local development runbook](docs/local-development.md). Container build and deployment preparation steps are documented in [docs/deployment.md](docs/deployment.md). Hosted deployment is on the [roadmap](docs/system-design.md#future-roadmap).
+## Screenshots
 
-## Known Limitations
+Screenshots are expected under `docs/screenshots/`. Add captured images there when preparing the final portfolio walkthrough.
 
-This project is intentionally scoped and the limitations are documented honestly:
+![Dashboard Screenshot](docs/screenshots/dashboard.png)
 
-- No authentication or authorization
-- No multi-tenancy
-- No hosted production deployment
-- No distributed tracing
-- No retry or dead-letter queue behavior for failed async jobs
-- Observability is limited to local logs and basic health checks
-- Redis caching is planned but not implemented
+![Deployment Detail Screenshot](docs/screenshots/deployment-detail.png)
 
-A fuller list and the roadmap are in [docs/system-design.md](docs/system-design.md#known-limitations).
+![AI Analysis Screenshot](docs/screenshots/ai-analysis.png)
 
-## Folder Structure
+See [docs/screenshot-checklist.md](docs/screenshot-checklist.md) for the recommended capture list.
 
-```text
-deployguard-ai/
-  backend/
-    deployguard-api/   Spring Boot API (risk engine, AI orchestration, async jobs)
-  ai-service/          FastAPI incident-analysis service (OpenRouter + fallback)
-  frontend/            Next.js dashboard
-  infra/               Docker Compose configuration
-  scripts/             Local development and demo scripts
-  docs/                Architecture, runbooks, and recruiter documentation
-  AGENTS.md
-  README.md
-```
+## Local Setup
 
-## Current Status
+### Prerequisites
 
-- Spring Boot backend with Projects, Deployments, CI runs, application logs, risk scoring, and synchronous + asynchronous AI analysis job APIs.
-- FastAPI AI service with incident analysis, OpenRouter support, and deterministic fallback behavior.
-- Next.js frontend with a local dashboard connected to the backend APIs.
-- Docker Compose runs PostgreSQL and RabbitMQ for local development.
-- Demo data can be created with `./scripts/seed-demo.sh`.
-- No API keys or secrets are included in the repository.
+- Java 21
+- Maven
+- Python 3.12
+- Node.js and npm
+- Docker Desktop
+- curl
 
-## Local PostgreSQL
-
-Start PostgreSQL for local development:
-
-```bash
-docker compose -f infra/docker-compose.yml up -d postgres
-```
-
-The Postgres service uses `postgres:16` with `platform: linux/arm64` so it runs cleanly on Apple Silicon.
-
-Verify it is running:
-
-```bash
-docker ps
-nc -zv localhost 5432
-```
-
-Troubleshooting:
-
-```bash
-docker logs deployguard-postgres
-```
-
-If Docker reports an `exec format error`, confirm `infra/docker-compose.yml` uses `image: postgres:16` and `platform: linux/arm64` for the `postgres` service, then recreate the container:
-
-```bash
-docker compose -f infra/docker-compose.yml down
-docker compose -f infra/docker-compose.yml up -d postgres
-```
-
-## Local Demo Data
-
-Use the demo seed script to create realistic local data for the frontend dashboard.
-
-Start local infrastructure from the repository root:
+### 1. Start infrastructure
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
 ```
 
-Start the backend:
+### 2. Start the AI service
+
+```bash
+cd ai-service
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+```
+
+### 3. Start the backend
 
 ```bash
 cd backend/deployguard-api
@@ -206,34 +165,152 @@ RABBITMQ_PASSWORD=deployguard \
 mvn spring-boot:run
 ```
 
-Start the AI service in a separate terminal. `OPENROUTER_API_KEY` is optional for local demo data because the AI service can return a fallback response.
-
-```bash
-cd ai-service
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8001
-```
-
-Start the frontend in another terminal:
+### 4. Start the frontend
 
 ```bash
 cd frontend
 npm install
-npm run dev
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
-Seed demo data from the repository root:
+Open http://localhost:3000.
+
+Full setup and troubleshooting: [docs/local-development.md](docs/local-development.md).
+
+## Environment Variables
+
+| Service | Variable | Local example | Notes |
+| --- | --- | --- | --- |
+| Backend | `DB_HOST` | `localhost` | PostgreSQL host |
+| Backend | `DB_PORT` | `5432` | PostgreSQL port |
+| Backend | `DB_NAME` | `deployguard` | Database name |
+| Backend | `DB_USERNAME` | `deployguard` | Local Docker username |
+| Backend | `DB_PASSWORD` | `deployguard` | Local-only password; use hosted secrets outside local dev |
+| Backend | `AI_SERVICE_BASE_URL` | `http://localhost:8001` | FastAPI service URL |
+| Backend | `RABBITMQ_HOST` | `localhost` | RabbitMQ host |
+| Backend | `RABBITMQ_PORT` | `5672` | RabbitMQ AMQP port |
+| Backend | `RABBITMQ_USERNAME` | `deployguard` | Local Docker username |
+| Backend | `RABBITMQ_PASSWORD` | `deployguard` | Local-only password; use hosted secrets outside local dev |
+| Backend | `FRONTEND_ALLOWED_ORIGINS` | `http://localhost:3000` | CORS allow-list |
+| AI service | `OPENROUTER_API_KEY` | empty | Secret; never commit a real key |
+| AI service | `OPENROUTER_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | Confirm availability in OpenRouter |
+| AI service | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
+| AI service | `OPENROUTER_TIMEOUT_SECONDS` | `30` | Model request timeout |
+| Frontend | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8080` | Public browser value; not a secret |
+
+More detail: [docs/configuration.md](docs/configuration.md).
+
+## Seed Demo Data
+
+After the backend, AI service, frontend, PostgreSQL, and RabbitMQ are running:
 
 ```bash
 ./scripts/seed-demo.sh
 ```
 
-Override the backend URL when needed:
+The script creates:
+
+- one project
+- one high-risk production deployment
+- one failed CI run
+- one `ERROR` application log
+- a recalculated risk score
+- one queued async AI analysis job
+
+Override the backend URL if needed:
 
 ```bash
 BACKEND_URL=http://localhost:8080 ./scripts/seed-demo.sh
 ```
 
-The script creates one project, one high-risk production deployment, one failed CI run, one `ERROR` application log, recalculates risk, and queues an async AI analysis job. It prints the created `PROJECT_ID`, `DEPLOYMENT_ID`, `JOB_ID`, and frontend URLs for viewing the seeded data.
+## Validation and Smoke Tests
+
+Run the complete local demo validation:
+
+```bash
+./scripts/validate-demo.sh
+```
+
+Run the AI service smoke test:
+
+```bash
+./scripts/smoke-test-ai.sh
+```
+
+Run component checks:
+
+```bash
+# Backend
+cd backend/deployguard-api
+mvn test
+
+# AI service
+cd ai-service
+python -m pytest
+
+# Frontend
+cd frontend
+npm run build
+```
+
+## Deployment Architecture
+
+- **Vercel:** hosts the Next.js frontend.
+- **Railway:** hosts the Spring Boot backend, FastAPI AI service, PostgreSQL, and RabbitMQ.
+- **OpenRouter:** provides model access for NVIDIA Nemotron incident summaries.
+- **Fallback mode:** keeps AI analysis operational when a model key is missing or a model call fails.
+
+Deployment configuration details are in [docs/deployment.md](docs/deployment.md). Do not commit platform tokens, database credentials, RabbitMQ credentials, or OpenRouter keys.
+
+## System Design Concepts Demonstrated
+
+- Monorepo organization across backend, AI service, frontend, infra, scripts, and docs
+- REST API design with validation and structured error responses
+- Relational data modeling for deployment, CI, log, AI summary, and job entities
+- Flyway schema migration discipline
+- Deterministic scoring separate from probabilistic AI output
+- Async job processing with RabbitMQ and a tracked job lifecycle
+- Graceful degradation when external AI providers fail
+- CORS configuration for hosted frontend/backend separation
+- Dockerized services and local reproducibility
+- Deployment split across Vercel and Railway
+
+## Resume Bullet Examples
+
+- Built **DeployGuard AI**, a production-style DevOps platform using Spring Boot, FastAPI, Next.js, PostgreSQL, and RabbitMQ to correlate deployment, CI/CD, and log signals into explainable deployment risk scores.
+- Designed synchronous and asynchronous AI incident-analysis workflows with OpenRouter/NVIDIA Nemotron integration, deterministic fallback behavior, and persisted AI summary history.
+- Implemented a RabbitMQ-backed job pipeline for AI analysis with `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` states, decoupling model latency from API requests.
+- Deployed a full-stack portfolio demo with Vercel frontend hosting and Railway backend, AI service, PostgreSQL, and RabbitMQ infrastructure.
+
+More examples: [docs/resume-bullets.md](docs/resume-bullets.md).
+
+## Repository Structure
+
+```text
+deployguard-ai/
+  backend/deployguard-api/   Spring Boot API, risk engine, AI orchestration
+  ai-service/                FastAPI OpenRouter/Nemotron analysis service
+  frontend/                  Next.js dashboard
+  infra/                     Docker Compose for local infrastructure
+  scripts/                   Demo seed, AI smoke test, E2E validation
+  docs/                      Architecture, deployment, runbooks, recruiter docs
+```
+
+## Known Limitations
+
+- No authentication or authorization yet
+- No multi-tenancy yet
+- Hosted demo exists, but there is no production-grade SaaS deployment
+- No distributed tracing yet
+- No retry or dead-letter queue behavior for failed async jobs
+- Observability is limited to logs and health checks
+- Redis caching is planned but not implemented
+
+## Security Notes
+
+- No API keys or secrets are committed.
+- `.env` files are ignored and should stay local.
+- Local Docker Compose credentials are development-only.
+- OpenRouter keys belong in a local `.env` file or hosted secret manager.
+
+See [docs/security-notes.md](docs/security-notes.md).
