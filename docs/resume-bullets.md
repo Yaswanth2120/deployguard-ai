@@ -14,7 +14,7 @@ Every bullet below is truthful against the implementation. None of them claim pr
 - Implemented a **deterministic risk engine** that scores deployments from explicit additive signals (failed CI, failed tests, ERROR logs, hotfix branches, production environment), capping at 100 and mapping to LOW/MEDIUM/HIGH for explainable, repeatable results independent of any model.
 - Built an **asynchronous AI analysis pipeline** with RabbitMQ: the API enqueues a job and returns immediately, a Spring Boot consumer processes it through a PENDING → PROCESSING → COMPLETED/FAILED lifecycle, and clients poll job status — keeping request latency decoupled from model latency.
 - Developed a **FastAPI AI service** that calls OpenRouter (NVIDIA Nemotron) with a grounded, JSON-only prompt and validates response shape, returning a **deterministic fallback** on missing key, provider error, timeout, or malformed output so the system degrades gracefully.
-- Created a **Next.js / React / TypeScript dashboard** showing projects, deployments, risk levels, and AI activity, backed by documented REST APIs and reproducible demo data via a seed script and Docker Compose.
+- Created a **Next.js / React / TypeScript dashboard** showing projects, deployments, risk levels, and AI activity, backed by documented REST APIs, reproducible demo data via a seed script, and a hosted portfolio deployment on Vercel/Railway.
 
 ## LinkedIn Project Description
 
@@ -22,13 +22,13 @@ Every bullet below is truthful against the implementation. None of them claim pr
 >
 > A local-first platform that correlates deployment events, CI/CD results, and application logs to assess release risk and speed up incident triage. A deterministic, rule-based engine scores each deployment from concrete signals (failed CI, error logs, hotfix branches, production targets), while a separate FastAPI service generates AI incident summaries through OpenRouter / NVIDIA Nemotron — with a deterministic fallback so it works with no API key. Supports both synchronous analysis and an asynchronous RabbitMQ job pipeline with a tracked lifecycle.
 >
-> Stack: Spring Boot (Java 21), FastAPI (Python), Next.js / React / TypeScript, PostgreSQL, RabbitMQ, Flyway, Docker Compose.
+> Stack: Spring Boot (Java 21), FastAPI (Python), Next.js / React / TypeScript, PostgreSQL, RabbitMQ, Flyway, Docker Compose, Railway, Vercel.
 >
-> Scoped honestly as a local project: no authentication, multi-tenancy, or hosted deployment yet — those are on the roadmap.
+> Scoped honestly as a portfolio project: hosted demo available, but authentication, multi-tenancy, production observability, and production hardening are still on the roadmap.
 
 ## GitHub Repository Description
 
-> Deployment risk & incident-analysis platform: deterministic risk engine + AI incident summaries (OpenRouter/Nemotron with fallback). Spring Boot, FastAPI, Next.js, PostgreSQL, RabbitMQ. Local-first.
+> Deployment risk & incident-analysis platform: deterministic risk engine + AI incident summaries (OpenRouter/Nemotron with fallback). Spring Boot, FastAPI, Next.js, PostgreSQL, RabbitMQ. Hosted demo on Vercel/Railway.
 
 ## STAR Examples
 
