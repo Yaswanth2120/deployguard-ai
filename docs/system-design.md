@@ -1,21 +1,21 @@
 # System Design
 
-DeployGuard AI is a deployment risk and incident analysis platform. The current local system combines a Next.js dashboard, Spring Boot API, PostgreSQL database, RabbitMQ queue, FastAPI AI service, and OpenRouter-backed NVIDIA Nemotron analysis with deterministic fallback behavior.
+DeployGuard AI is a deployment risk and incident analysis platform. The system combines a Next.js dashboard, Spring Boot API, PostgreSQL database, RabbitMQ queue, FastAPI AI service, and OpenRouter-backed NVIDIA Nemotron analysis with deterministic fallback behavior. The portfolio demo is hosted with Vercel for the frontend and Railway for the backend, AI service, PostgreSQL, and RabbitMQ.
 
 ## High-Level Architecture
 
 ```mermaid
 flowchart LR
-    user["Developer / Operator"] --> frontend["Next.js frontend"]
-    frontend --> backend["Spring Boot backend"]
+    user["Developer / Operator"] --> frontend["Next.js frontend<br/>Vercel"]
+    frontend --> backend["Spring Boot backend<br/>Railway"]
     apiClient["API client"] --> backend
 
-    backend --> db[("PostgreSQL")]
-    backend --> rabbit["RabbitMQ"]
+    backend --> db[("PostgreSQL<br/>Railway")]
+    backend --> rabbit["RabbitMQ<br/>Railway"]
     rabbit --> worker["AI analysis worker<br/>(Spring Boot consumer)"]
     worker --> backendService["Backend AI analysis service layer"]
     backendService --> db
-    backendService --> aiService["FastAPI AI service"]
+    backendService --> aiService["FastAPI AI service<br/>Railway"]
     backend --> aiService
     aiService --> openrouter["OpenRouter"]
     openrouter --> nemotron["NVIDIA Nemotron"]
@@ -179,7 +179,7 @@ OpenRouter / NVIDIA Nemotron
 - No authentication is implemented.
 - No multi-tenancy is implemented.
 - No distributed tracing is implemented.
-- No production deployment is configured yet.
+- Hosted demo deployment exists, but no production-grade SaaS deployment is implemented yet.
 - No retry or dead-letter queue behavior is documented as implemented.
 - Observability is limited to local logs and basic health checks.
 - Evidence and recommended actions are stored as JSON text rather than first-class relational structures.
@@ -192,6 +192,6 @@ OpenRouter / NVIDIA Nemotron
 - CI/CD provider integrations
 - Retry and dead-letter queues for failed async jobs
 - Distributed tracing and richer metrics
-- Hosted deployment
+- Production hardening for the hosted deployment
 - Production-grade secrets management
 - More robust search, filtering, and indexing for logs and deployment history

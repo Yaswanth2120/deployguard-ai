@@ -1,6 +1,6 @@
 # Interview Guide
 
-This guide is written to match the actual implementation. Every claim here can be checked against the source in `backend/`, `ai-service/`, and `frontend/`. It avoids any metric the project does not measure (no latency numbers, uptime, traffic, cost savings, or user counts) and any capability the project does not have (no authentication, multi-tenancy, distributed tracing, or hosted production deployment).
+This guide is written to match the actual implementation. Every claim here can be checked against the source in `backend/`, `ai-service/`, and `frontend/`. It avoids any metric the project does not measure (no latency numbers, uptime, traffic, cost savings, or user counts) and any capability the project does not have (no authentication, multi-tenancy, distributed tracing, retry/DLQ behavior, or production-grade SaaS deployment).
 
 ## 30-Second Explanation
 
@@ -18,7 +18,7 @@ This guide is written to match the actual implementation. Every claim here can b
 >
 > There are two ways to run analysis: synchronous, where the backend calls the AI service inline and returns the summary; and asynchronous, where the backend creates a job, publishes to RabbitMQ, and a consumer processes it while the client polls for status. A Next.js dashboard shows projects, deployments, risk, and AI activity.
 >
-> It runs locally with Docker Compose. There's no auth, multi-tenancy, or hosted deployment yet — those are roadmap items.
+> It runs locally with Docker Compose and also has a hosted portfolio demo on Vercel/Railway. There's no auth, multi-tenancy, distributed tracing, or production-grade SaaS hardening yet — those are roadmap items.
 
 ## Five-Minute Architecture Walkthrough
 
@@ -129,7 +129,7 @@ These are the intended scaling levers, described honestly as design intent rathe
 
 - No authentication or authorization.
 - No multi-tenancy.
-- No hosted production deployment.
+- Hosted portfolio demo exists, but there is no production-grade SaaS deployment.
 - No distributed tracing; observability is local logs and basic health checks.
 - No retry or dead-letter queue for failed async jobs.
 - Evidence and recommended actions are stored as JSON text, not first-class relational structures.
@@ -141,7 +141,7 @@ These are the intended scaling levers, described honestly as design intent rathe
 - GitHub webhook ingestion and CI/CD provider integrations to replace manual/seeded data.
 - Retry and dead-letter queues for failed async jobs.
 - Distributed tracing and richer metrics.
-- Hosted deployment and production-grade secrets management.
+- Production hardening for the hosted deployment and production-grade secrets management.
 - Better search, filtering, and indexing for logs and deployment history.
 
 ## Likely Interviewer Questions (and Truthful Answers)
@@ -162,7 +162,7 @@ They serve different callers. Sync is for "I need the summary now." Async is for
 Not yet. A failed job is marked `FAILED` with an error message. Retry and a dead-letter queue are on the roadmap.
 
 **Is this deployed anywhere / how much traffic does it handle?**
-There's no hosted deployment and no production traffic. It runs locally via Docker Compose. I haven't measured latency or throughput, so I won't claim numbers.
+Yes, there is a hosted portfolio demo on Vercel/Railway. It is not a production SaaS system and there is no measured production traffic, latency, throughput, or uptime, so I won't claim those numbers.
 
 **Is there authentication?**
 No. No auth, no multi-tenancy. Those are explicitly out of current scope and on the roadmap.
@@ -174,4 +174,4 @@ Isolation. The model dependency is the least reliable part of the system, so it 
 Run multiple RabbitMQ consumers, keep backend instances stateless, add database indexes for hot lookups, and treat OpenRouter quotas as a capacity limit. I'd also add retries with a dead-letter queue before scaling load.
 
 **What would you build next?**
-GitHub webhook and CI/CD ingestion so the data isn't manual/seeded, then retries/DLQ for reliability, then auth before any real hosting.
+GitHub webhook and CI/CD ingestion so the data isn't manual/seeded, then retries/DLQ for reliability, then authentication and production hardening for the hosted demo.

@@ -1,16 +1,22 @@
-# Production Deployment Preparation
+# Deployment
 
-DeployGuard AI does not have production URLs or a selected cloud provider yet. This guide prepares the current services for container deployment while keeping secrets external and preserving the local development workflow.
+DeployGuard AI has a hosted portfolio demo split across Vercel and Railway:
+
+- Frontend: https://deployguard-ai-coral.vercel.app/
+- Backend API: https://deployguard-api-production.up.railway.app
+- AI service: https://deployguard-ai-production.up.railway.app
+
+This guide documents the deployment shape and the environment variables needed to run the current services while keeping secrets external. The hosted demo is not a production-grade SaaS deployment.
 
 ## Deployment Order
 
 Deploy services in this order:
 
-1. Hosted PostgreSQL
-2. Hosted RabbitMQ
+1. Railway PostgreSQL
+2. Railway RabbitMQ
 3. FastAPI AI service
 4. Spring Boot backend
-5. Next.js frontend
+5. Vercel frontend
 
 The backend depends on PostgreSQL, RabbitMQ, and the AI service. The frontend depends on the backend URL being known at build time because `NEXT_PUBLIC_API_BASE_URL` is bundled into browser JavaScript by Next.js.
 
@@ -18,14 +24,14 @@ The backend depends on PostgreSQL, RabbitMQ, and the AI service. The frontend de
 
 PostgreSQL:
 
-- Use a hosted PostgreSQL database.
+- Use a hosted PostgreSQL database such as Railway PostgreSQL.
 - Store the host, port, database name, username, and password in the deployment platform configuration or secret manager.
 - Do not reuse local Docker Compose credentials in hosted environments.
 - Flyway runs automatically when the backend starts and applies migrations from `backend/deployguard-api/src/main/resources/db/migration`.
 
 RabbitMQ:
 
-- Use a hosted RabbitMQ broker.
+- Use a hosted RabbitMQ broker such as Railway RabbitMQ.
 - Store the host, port, username, and password in the deployment platform configuration or secret manager.
 - The current async AI analysis workflow expects RabbitMQ to be reachable before backend startup.
 
@@ -58,7 +64,7 @@ PORT=8080
 FRONTEND_ALLOWED_ORIGINS=https://frontend.example.invalid,http://localhost:3000
 ```
 
-Use placeholder values until real production origins exist.
+For the hosted demo, include the Vercel frontend origin and any local origins needed for development.
 
 ### AI Service
 
@@ -96,7 +102,7 @@ docker build \
   frontend
 ```
 
-For hosted deployment, replace image tags with your registry tags. No production registry or cloud provider is configured in this repository.
+For hosted deployment, replace image tags with your registry tags or use the deployment platform's source-based build flow.
 
 ## Local Container Run Commands
 
@@ -226,6 +232,6 @@ RabbitMQ jobs do not complete:
 ## Not Included
 
 - No Kubernetes manifests are included.
-- No cloud provider is selected.
-- No production URL is configured.
+- No production-grade SaaS deployment is configured.
 - No credentials or provider secrets are committed.
+- No authentication, multi-tenancy, distributed tracing, or retry/DLQ behavior is implemented yet.
