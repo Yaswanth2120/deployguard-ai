@@ -6,6 +6,8 @@ DeployGuard AI correlates deployments, CI/CD runs, and application logs to detec
 
 ## Live Demo
 
+> **Backend and AI service are currently paused** (Railway free-tier credits ran out). The frontend link still loads, but API calls will fail until the Railway services are redeployed under a paid plan or migrated to another host. In the meantime, see [Local Setup](#local-setup) to run the full stack yourself — that path is unaffected.
+
 | Service | URL |
 | --- | --- |
 | Frontend dashboard | https://deployguard-ai-coral.vercel.app/ |
