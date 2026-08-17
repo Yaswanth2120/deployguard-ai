@@ -1,5 +1,13 @@
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
+export type PullRequestRiskScore = {
+  score: number;
+  riskLevel: RiskLevel;
+  rationale: string;
+  factors: Array<{ name: string; contribution: number; detail: string }>;
+  calculatedAt: string;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -69,13 +77,18 @@ export type AiAnalysisJob = {
   completedAt: string | null;
 };
 
+import { getAccessToken } from "@/lib/authToken";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAccessToken();
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -96,6 +109,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getProjects() {
   return request<Project[]>("/api/projects");
+}
+
+export async function getPullRequestRiskScore(pullRequestId: string) {
+  return request<PullRequestRiskScore>(`/api/v1/pull-requests/${pullRequestId}/risk-score`);
 }
 
 export async function getProject(projectId: string) {

@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: DeployGuard AI Service
+  version: 0.1.0
+paths:
+  /v1/risk-scores: {post: {operationId: calculateRiskScore, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RiskScoreRequest'}}}}, responses: {'200': {description: Risk score, content: {application/json: {schema: {$ref: '#/components/schemas/RiskScoreResponse'}}}}, '422': {description: Invalid payload}}}}
+components:
+  schemas:
+    PullRequestContext:
+      type: object
+      required: [repositoryId, number, commitSha, sourceBranch, targetBranch]
+      properties: {repositoryId: {type: string}, number: {type: integer}, commitSha: {type: string}, sourceBranch: {type: string}, targetBranch: {type: string}, title: {type: string}}
+    CiRunContext:
+      type: object
+      required: [provider, status]
+      properties: {provider: {type: string}, status: {type: string}, failedTests: {type: integer, minimum: 0}, durationSeconds: {type: integer, minimum: 0}}
+    LogContext:
+      type: object
+      required: [severity, message, timestamp]
+      properties: {severity: {type: string}, message: {type: string}, timestamp: {type: string, format: date-time}}
+    RiskScoreRequest:
+      type: object
+      required: [pullRequest, ciRuns, logs]
+      properties: {pullRequest: {$ref: '#/components/schemas/PullRequestContext'}, ciRuns: {type: array, items: {$ref: '#/components/schemas/CiRunContext'}}, logs: {type: array, items: {$ref: '#/components/schemas/LogContext'}}}
+    RiskFactor:
+      type: object
+      required: [name, contribution]
+      properties: {name: {type: string}, contribution: {type: number}}
+    RiskScoreResponse:
+      type: object
+      required: [score, riskLevel, rationale, factors, modelVersion]
+      properties: {score: {type: integer, minimum: 0, maximum: 100}, riskLevel: {type: string, enum: [LOW, MEDIUM, HIGH]}, rationale: {type: string}, factors: {type: array, items: {$ref: '#/components/schemas/RiskFactor'}}, modelVersion: {type: string}}

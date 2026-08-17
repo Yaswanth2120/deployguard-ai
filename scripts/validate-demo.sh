@@ -2,6 +2,7 @@
 set -uo pipefail
 
 BACKEND_URL="${BACKEND_URL:-http://localhost:8080}"
+AUTH_TOKEN="${AUTH_TOKEN:-}"
 AI_SERVICE_URL="${AI_SERVICE_URL:-http://127.0.0.1:8001}"
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:3000}"
 POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-2}"
@@ -226,13 +227,13 @@ validate_positive_integer "POLL_TIMEOUT_SECONDS" "$POLL_TIMEOUT_SECONDS"
 abort_if_failed
 
 section "Infrastructure"
-if container_running deployguard-postgres; then
+if docker compose -f "$ROOT_DIR/infra/docker-compose.yml" ps --status running --services | grep -qx postgres; then
   pass "PostgreSQL container is running"
 else
   fail "PostgreSQL container deployguard-postgres is not running"
 fi
 
-if container_running deployguard-rabbitmq; then
+if docker compose -f "$ROOT_DIR/infra/docker-compose.yml" ps --status running --services | grep -qx rabbitmq; then
   pass "RabbitMQ container is running"
 else
   fail "RabbitMQ container deployguard-rabbitmq is not running"
@@ -258,7 +259,7 @@ health_check "frontend" "$FRONTEND_URL"
 abort_if_failed
 
 section "Seed Demo Data"
-SEED_OUTPUT="$(BACKEND_URL="$BACKEND_URL" FRONTEND_URL="$FRONTEND_URL" "$ROOT_DIR/scripts/seed-demo.sh" 2>&1)"
+SEED_OUTPUT="$(BACKEND_URL="$BACKEND_URL" FRONTEND_URL="$FRONTEND_URL" AUTH_TOKEN="$AUTH_TOKEN" "$ROOT_DIR/scripts/seed-demo.sh" 2>&1)"
 SEED_STATUS=$?
 echo "$SEED_OUTPUT"
 

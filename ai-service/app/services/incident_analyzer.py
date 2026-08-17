@@ -98,7 +98,7 @@ def parse_model_response(raw_response: str) -> IncidentAnalysisResponse:
 
 def validate_response_shape(parsed: Any) -> None:
     if not isinstance(parsed, dict):
-        raise ValueError("Model response must be a JSON object.")
+        raise TypeError("Model response must be a JSON object.")
 
     response_keys = set(parsed.keys())
     if response_keys != EXPECTED_RESPONSE_KEYS:

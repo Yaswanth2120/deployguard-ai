@@ -19,6 +19,13 @@ deployguard:
     base-url: ${AI_SERVICE_BASE_URL:http://localhost:8001}
   cors:
     allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  auth:
+    github:
+      client-id: ${GITHUB_CLIENT_ID:}
+      client-secret: ${GITHUB_CLIENT_SECRET:}
+    jwt:
+      signing-key: ${JWT_SIGNING_KEY:dev-only-signing-key-change-me-0123456789abcdef0123456789abcdef}
+      expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
   jpa:
     hibernate:
       ddl-auto: validate

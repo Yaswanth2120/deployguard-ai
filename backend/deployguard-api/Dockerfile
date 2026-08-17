@@ -12,6 +12,10 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system deployguard && useradd --system --gid deployguard deployguard
 
 COPY --from=build /workspace/target/deployguard-api-*.jar app.jar

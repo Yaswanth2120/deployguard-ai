@@ -1,0 +1,4 @@
+package com.deployguard.api.pullrequest;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+public interface PullRequestRepository extends JpaRepository<PullRequest, UUID> { }

@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: DeployGuard API
+  version: 0.1.0
+  description: Planned v1 contract. User-facing endpoints require bearer authentication; webhook signature validation is described in docs/auth-strategy.md.
+paths:
+  /api/v1/pull-requests:
+    post:
+      operationId: ingestPullRequest
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PullRequestRequest'}}}}
+      responses: {'201': {description: Persisted pull request, content: {application/json: {schema: {$ref: '#/components/schemas/PullRequest'}}}}, '400': {$ref: '#/components/responses/BadRequest'}}
+  /api/v1/webhooks/ci-cd:
+    post:
+      operationId: receiveCiCdWebhook
+      parameters:
+        - {name: X-Event-Type, in: header, required: true, schema: {type: string}}
+        - {name: X-Delivery-Id, in: header, required: true, schema: {type: string}}
+        - {name: X-Webhook-Signature, in: header, required: true, schema: {type: string}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CiCdWebhookRequest'}}}}
+      responses: {'202': {description: Accepted}, '401': {description: Invalid signature}, '409': {description: Duplicate delivery}}
+  /api/v1/pull-requests/{pullRequestId}/risk-score:
+    get:
+      operationId: getPullRequestRiskScore
+      security: [{bearerAuth: []}]
+      parameters: [{name: pullRequestId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'200': {description: Latest risk score, content: {application/json: {schema: {$ref: '#/components/schemas/RiskScore'}}}}, '404': {description: Pull request not found}}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  responses:
+    BadRequest: {description: Invalid request}
+  schemas:
+    PullRequestRequest:
+      type: object
+      required: [projectId, provider, providerPullRequestId, number, title, authorId, sourceBranch, targetBranch, commitSha, status]
+      properties: {projectId: {type: string, format: uuid}, provider: {type: string}, providerPullRequestId: {type: string}, number: {type: integer}, title: {type: string}, authorId: {type: string}, sourceBranch: {type: string}, targetBranch: {type: string}, commitSha: {type: string}, status: {type: string, enum: [OPEN, MERGED, CLOSED]}}
+    PullRequest:
+      allOf: [{$ref: '#/components/schemas/PullRequestRequest'}, {type: object, required: [id, createdAt, updatedAt], properties: {id: {type: string, format: uuid}, createdAt: {type: string, format: date-time}, updatedAt: {type: string, format: date-time}}}]
+    CiCdWebhookRequest:
+      type: object
+      required: [provider, repositoryId, payload]
+      properties: {provider: {type: string}, repositoryId: {type: string}, payload: {type: object, additionalProperties: true, description: Redacted provider payload}}
+    RiskFactor:
+      type: object
+      required: [name, contribution]
+      properties: {name: {type: string}, contribution: {type: number}, detail: {type: string}}
+    RiskScore:
+      type: object
+      required: [score, riskLevel, rationale, factors, calculatedAt]
+      properties: {score: {type: integer, minimum: 0, maximum: 100}, riskLevel: {type: string, enum: [LOW, MEDIUM, HIGH]}, rationale: {type: string}, factors: {type: array, items: {$ref: '#/components/schemas/RiskFactor'}}, calculatedAt: {type: string, format: date-time}}

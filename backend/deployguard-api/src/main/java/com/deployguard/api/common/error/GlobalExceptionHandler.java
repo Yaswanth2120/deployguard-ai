@@ -3,9 +3,12 @@ package com.deployguard.api.common.error;
 import com.deployguard.api.ai.AiServiceUnavailableException;
 import com.deployguard.api.ai.job.AiAnalysisJobNotFoundException;
 import com.deployguard.api.ai.job.AiAnalysisJobPublishException;
+import com.deployguard.api.auth.GithubOAuthException;
+import com.deployguard.api.auth.InvalidTokenException;
 import com.deployguard.api.cirun.CiRunNotFoundException;
 import com.deployguard.api.deployment.DeploymentNotFoundException;
 import com.deployguard.api.project.ProjectNotFoundException;
+import com.deployguard.api.pullrequest.PullRequestNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.util.stream.Collectors;
@@ -42,6 +45,14 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
     }
 
+    @ExceptionHandler(PullRequestNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handlePullRequestNotFound(
+            PullRequestNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(AiServiceUnavailableException.class)
     public ResponseEntity<ApiErrorResponse> handleAiServiceUnavailable(
             AiServiceUnavailableException exception,
@@ -64,6 +75,22 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return buildResponse(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(GithubOAuthException.class)
+    public ResponseEntity<ApiErrorResponse> handleGithubOAuthFailure(
+            GithubOAuthException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidToken(
+            InvalidTokenException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

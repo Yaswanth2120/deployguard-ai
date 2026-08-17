@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { AuthStatus } from "@/components/AuthStatus";
 
 const navItems = [
   { href: "/", label: "Dashboard" },
   { href: "/projects", label: "Projects" },
   { href: "/deployments", label: "Deployments" },
+  { href: "/risk-scores", label: "Risk scores" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -29,6 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+          <AuthStatus />
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>

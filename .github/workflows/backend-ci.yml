@@ -45,6 +45,6 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Run backend tests
+      - name: Build, test, and run compiler lint
         working-directory: backend/deployguard-api
-        run: mvn test
+        run: mvn --batch-mode verify

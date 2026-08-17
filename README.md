@@ -12,7 +12,7 @@ DeployGuard AI correlates deployments, CI/CD runs, and application logs to detec
 | Backend API | https://deployguard-api-production.up.railway.app |
 | AI service | https://deployguard-ai-production.up.railway.app |
 
-> The hosted demo is a portfolio deployment, not a production SaaS environment. Authentication, multi-tenancy, distributed tracing, and retry/DLQ behavior are not implemented yet.
+> The hosted demo is a portfolio deployment, not a production SaaS environment. GET endpoints are intentionally public so recruiters can browse without signing in; write endpoints (ingestion, risk recalculation, AI analysis) require GitHub sign-in. Multi-tenancy, per-project role enforcement, distributed tracing, and retry/DLQ behavior are not implemented yet.
 
 ## Recruiter Quick Links
 
@@ -21,6 +21,8 @@ DeployGuard AI correlates deployments, CI/CD runs, and application logs to detec
 - [System design](docs/system-design.md) — architecture diagrams, data model, reliability behavior, and scaling notes.
 - [Deployment guide](docs/deployment.md) — Railway/Vercel deployment configuration and container build notes.
 - [E2E demo validation](docs/e2e-demo-validation.md) — local validation script and expected checks.
+- [Data model](docs/data-model.md), [API contract](docs/deployguard-api.openapi.yaml), and [AI contract](docs/ai-service-contract.yaml) — planned v1 integration surface.
+- [Auth strategy](docs/auth-strategy.md), [runtime/configuration](docs/runtime-and-configuration.md), and [testing strategy](docs/testing-strategy.md) — operational design decisions.
 
 ## Problem
 
@@ -41,6 +43,7 @@ The AI service integrates with OpenRouter/NVIDIA Nemotron when an API key is con
 
 ## Key Features
 
+- **GitHub OAuth authentication:** Authorization Code + PKCE sign-in against GitHub; the API issues a short-lived JWT that gates write endpoints while reads stay public.
 - **Deployment risk scoring:** deterministic score from failed CI, failed tests, ERROR logs, hotfix branches, and production deploys.
 - **Incident context model:** projects, deployments, CI/CD runs, application logs, AI summaries, and async jobs stored in PostgreSQL.
 - **Synchronous AI analysis:** immediate incident summary with root cause, evidence, recommended actions, severity, and confidence.
@@ -108,6 +111,18 @@ Detailed diagrams are in [docs/system-design.md](docs/system-design.md).
 5. Worker calls the same AI analysis flow.
 6. Worker stores the summary and marks the job `COMPLETED`, or stores an error and marks it `FAILED`.
 7. Client polls `GET /api/ai-analysis/jobs/{jobId}`.
+
+## Authentication
+
+GET endpoints stay public so the dashboard is browsable without signing in. Write endpoints (ingestion, risk recalculation, sync/async AI analysis) require a signed-in GitHub session:
+
+1. The frontend generates a PKCE `code_verifier`/`code_challenge` pair and redirects to GitHub's OAuth authorize endpoint.
+2. GitHub redirects back to `/auth/callback` with an authorization code.
+3. The frontend posts the code and verifier to `POST /api/auth/github/callback`.
+4. The backend exchanges the code with GitHub, fetches the GitHub user, and issues a short-lived JWT (`Authorization: Bearer` token).
+5. The frontend attaches that token to write requests; the backend's Spring Security filter chain validates it and rejects unauthenticated writes with `401`.
+
+This is a real, working OAuth flow, not a stub — see [docs/auth-strategy.md](docs/auth-strategy.md) for the full design and its current scope (per-project role membership is not enforced yet; any authenticated GitHub user can run write actions).
 
 ## Screenshots
 
@@ -192,11 +207,18 @@ Full setup and troubleshooting: [docs/local-development.md](docs/local-developme
 | Backend | `RABBITMQ_USERNAME` | `deployguard` | Local Docker username |
 | Backend | `RABBITMQ_PASSWORD` | `deployguard` | Local-only password; use hosted secrets outside local dev |
 | Backend | `FRONTEND_ALLOWED_ORIGINS` | `http://localhost:3000` | CORS allow-list |
+| Backend | `GITHUB_CLIENT_ID` | your GitHub OAuth App client ID | Public, but still set per-environment |
+| Backend | `GITHUB_CLIENT_SECRET` | your GitHub OAuth App client secret | Secret; never commit a real value |
+| Backend | `JWT_SIGNING_KEY` | long random string | Secret; must differ per environment, never reuse the local default |
+| Backend | `JWT_EXPIRATION_MINUTES` | `60` | Session token lifetime |
 | AI service | `OPENROUTER_API_KEY` | empty | Secret; never commit a real key |
 | AI service | `OPENROUTER_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b:free` | Confirm availability in OpenRouter |
 | AI service | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
 | AI service | `OPENROUTER_TIMEOUT_SECONDS` | `30` | Model request timeout |
 | Frontend | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8080` | Public browser value; not a secret |
+| Frontend | `NEXT_PUBLIC_GITHUB_CLIENT_ID` | your GitHub OAuth App client ID | Public browser value; must match the backend's `GITHUB_CLIENT_ID` |
+
+Creating the GitHub OAuth App: GitHub Settings → Developer settings → OAuth Apps → New OAuth App. Set **Authorization callback URL** to `<frontend-origin>/auth/callback` (e.g. `http://localhost:3000/auth/callback` locally, or your Vercel URL in production). Copy the client ID into both `GITHUB_CLIENT_ID` (backend) and `NEXT_PUBLIC_GITHUB_CLIENT_ID` (frontend), and the client secret into `GITHUB_CLIENT_SECRET` (backend only).
 
 More detail: [docs/configuration.md](docs/configuration.md).
 
@@ -205,7 +227,8 @@ More detail: [docs/configuration.md](docs/configuration.md).
 After the backend, AI service, frontend, PostgreSQL, and RabbitMQ are running:
 
 ```bash
-./scripts/seed-demo.sh
+# Copy the short-lived bearer token from a signed-in browser session.
+AUTH_TOKEN=<bearer-token> ./scripts/seed-demo.sh
 ```
 
 The script creates:
@@ -298,7 +321,7 @@ deployguard-ai/
 
 ## Known Limitations
 
-- No authentication or authorization yet
+- Authentication covers sign-in and endpoint gating (GitHub OAuth + PKCE, backend-issued short-lived JWT); it does not yet enforce per-project role membership (viewer/operator/admin) — any authenticated GitHub user can run write actions
 - No multi-tenancy yet
 - Hosted demo exists, but there is no production-grade SaaS deployment
 - No distributed tracing yet

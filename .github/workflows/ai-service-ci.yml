@@ -29,8 +29,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Compile Python files
-        run: python -m compileall app
+      - name: Lint Python files
+        run: ruff check app tests
+
+      - name: Run tests
+        run: pytest
 
       - name: Smoke test health endpoint
         run: |

@@ -11,4 +11,6 @@ public interface ApplicationLogRepository extends JpaRepository<ApplicationLog, 
     List<ApplicationLog> findByDeploymentId(UUID deploymentId);
 
     List<ApplicationLog> findByProjectIdAndLevel(UUID projectId, String level);
+
+    List<ApplicationLog> findByDeploymentProjectIdAndDeploymentCommitSha(UUID projectId, String commitSha);
 }

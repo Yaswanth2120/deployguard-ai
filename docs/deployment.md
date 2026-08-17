@@ -53,8 +53,14 @@ RABBITMQ_USERNAME=<rabbitmq-user>
 RABBITMQ_PASSWORD=<rabbitmq-password>
 AI_SERVICE_BASE_URL=<ai-service-url>
 FRONTEND_ALLOWED_ORIGINS=<frontend-origin>
+GITHUB_CLIENT_ID=<github-oauth-app-client-id>
+GITHUB_CLIENT_SECRET=<github-oauth-app-client-secret>
+JWT_SIGNING_KEY=<long-random-secret-unique-per-environment>
+JWT_EXPIRATION_MINUTES=60
 PORT=8080
 ```
+
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` come from a GitHub OAuth App whose Authorization callback URL is `<frontend-origin>/auth/callback`. Never reuse `JWT_SIGNING_KEY` across environments, and never use the insecure local default from `.env.example` outside local dev.
 
 `SERVER_PORT` is still supported for local compatibility. If both `PORT` and `SERVER_PORT` are set, `PORT` wins.
 
@@ -82,10 +88,11 @@ PORT=8001
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=<backend-api-url>
+NEXT_PUBLIC_GITHUB_CLIENT_ID=<github-oauth-app-client-id>
 PORT=3000
 ```
 
-`NEXT_PUBLIC_API_BASE_URL` is a build-time public browser value. Changing it after the image is built will not update already bundled frontend JavaScript. Build one frontend image per backend API base URL, or rebuild the image when the backend URL changes.
+`NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_GITHUB_CLIENT_ID` are build-time public browser values. Changing them after the image is built will not update already bundled frontend JavaScript. Build one frontend image per backend API base URL, or rebuild the image when the backend URL or OAuth App changes. `NEXT_PUBLIC_GITHUB_CLIENT_ID` must match the backend's `GITHUB_CLIENT_ID`.
 
 Do not put secrets in frontend variables. Any `NEXT_PUBLIC_` variable is visible to browser users.
 
@@ -98,6 +105,7 @@ docker build -t deployguard-api:local backend/deployguard-api
 docker build -t deployguard-ai-service:local ai-service
 docker build \
   --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 \
+  --build-arg NEXT_PUBLIC_GITHUB_CLIENT_ID=<github-oauth-app-client-id> \
   -t deployguard-frontend:local \
   frontend
 ```

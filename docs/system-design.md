@@ -176,7 +176,7 @@ OpenRouter / NVIDIA Nemotron
 
 ## Known Limitations
 
-- No authentication is implemented.
+- GitHub OAuth (Authorization Code + PKCE) is implemented and gates write endpoints; GET endpoints stay public. Per-project role membership (viewer/operator/admin) from [auth-strategy.md](auth-strategy.md) is not enforced yet — any authenticated GitHub user can run write actions.
 - No multi-tenancy is implemented.
 - No distributed tracing is implemented.
 - Hosted demo deployment exists, but no production-grade SaaS deployment is implemented yet.
@@ -186,7 +186,7 @@ OpenRouter / NVIDIA Nemotron
 
 ## Future Roadmap
 
-- Authentication and authorization
+- Per-project role membership enforcement (viewer/operator/admin)
 - Multi-tenant organizations
 - GitHub webhook ingestion
 - CI/CD provider integrations

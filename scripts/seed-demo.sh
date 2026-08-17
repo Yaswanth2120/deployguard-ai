@@ -3,6 +3,12 @@ set -euo pipefail
 
 BACKEND_URL="${BACKEND_URL:-http://localhost:8080}"
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:3000}"
+AUTH_TOKEN="${AUTH_TOKEN:-}"
+AUTH_HEADERS=()
+
+if [ -n "$AUTH_TOKEN" ]; then
+  AUTH_HEADERS=(-H "Authorization: Bearer $AUTH_TOKEN")
+fi
 
 request() {
   local method="$1"
@@ -17,6 +23,7 @@ request() {
     status="$(curl -sS -o "$body_file" -w "%{http_code}" \
       -X "$method" "$BACKEND_URL$path" \
       -H "Content-Type: application/json" \
+      "${AUTH_HEADERS[@]}" \
       -d "$data")" || {
         rm -f "$body_file"
         echo "Request failed: $method $BACKEND_URL$path" >&2
@@ -52,6 +59,12 @@ echo "Checking backend at $BACKEND_URL..."
 if ! curl -fsS "$BACKEND_URL/api/health" >/dev/null; then
   echo "Backend is not running or is not reachable at $BACKEND_URL." >&2
   echo "Start the backend, then rerun: BACKEND_URL=$BACKEND_URL ./scripts/seed-demo.sh" >&2
+  exit 1
+fi
+
+if [ -z "$AUTH_TOKEN" ]; then
+  echo "AUTH_TOKEN is required because demo write endpoints are protected." >&2
+  echo "Sign in through the frontend, then provide its short-lived bearer token as AUTH_TOKEN." >&2
   exit 1
 fi
 

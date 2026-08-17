@@ -10,7 +10,6 @@ For the current detailed architecture, Mermaid diagrams, component responsibilit
 - Backend API: Core API for ingesting and querying pull requests, build results, deployments, and incidents.
 - AI service: Dedicated service for incident analysis with OpenRouter/NVIDIA Nemotron support and fallback behavior.
 - PostgreSQL: Primary relational data store.
-- Redis: Future caching and lightweight coordination.
 - RabbitMQ: Asynchronous AI analysis job processing.
 - External systems: GitHub, CI/CD providers, deployment systems, and application log sources.
 
@@ -36,4 +35,4 @@ GitHub / CI/CD / Deployments / Logs
 
 ## Current Scope
 
-The repository currently includes the Spring Boot backend, FastAPI AI service, Next.js frontend, PostgreSQL, RabbitMQ, risk scoring, AI analysis endpoints, and local demo scripts. Authentication, multi-tenancy, production deployment, distributed tracing, and Redis are not implemented.
+The repository currently includes the Spring Boot backend, FastAPI AI service, Next.js frontend, PostgreSQL, RabbitMQ, risk scoring, AI analysis endpoints, GitHub OAuth authentication for write endpoints, and local demo scripts. Multi-tenancy, per-project role enforcement, distributed tracing, and Redis are not implemented.

@@ -1,6 +1,6 @@
 # Security Notes
 
-DeployGuard AI is currently a local development project. Production hardening is not complete.
+DeployGuard AI has a hosted portfolio demo. Production hardening is not complete.
 
 ## Do Not Commit Secrets
 
@@ -62,9 +62,8 @@ No output means the key prefix was not found in the current committed tree.
 
 ## Current Security Limitations
 
-- No authentication is implemented.
-- No authorization is implemented.
+- GitHub OAuth and short-lived JWTs protect write endpoints; read endpoints remain public for the portfolio demo.
+- Per-project authorization is not implemented; any authenticated GitHub user can write to any project ID.
 - No multi-tenancy is implemented.
 - No production secret manager is configured.
-- No hosted deployment is configured.
 - No distributed tracing is implemented.

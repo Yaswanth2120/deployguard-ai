@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RiskBadge } from "@/components/RiskBadge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useAuth } from "@/lib/AuthProvider";
 import {
   AiAnalysisJob,
   AiIncidentSummary,
@@ -60,6 +61,7 @@ export default function DeploymentDetailPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<ActionKey | null>(null);
+  const { user, login } = useAuth();
 
   const loadDetail = useCallback(async () => {
     try {
@@ -151,31 +153,48 @@ export default function DeploymentDetailPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-ink">Deployment actions</h2>
-            <p className="mt-1 text-xs text-muted">Run risk scoring and AI analysis against the current backend data.</p>
+            <p className="mt-1 text-xs text-muted">
+              {user
+                ? "Run risk scoring and AI analysis against the current backend data."
+                : "Sign in with GitHub to run risk scoring and AI analysis."}
+            </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3 lg:w-auto">
             <ActionButton
               label="Recalculate Risk"
               busyLabel={actionLabels.risk}
               isBusy={activeAction === "risk"}
-              disabled={Boolean(activeAction)}
-              onClick={() => runAction("risk", () => recalculateRisk(deployment.id), "Risk score recalculated.")}
+              disabled={user ? Boolean(activeAction) : false}
+              title={user ? undefined : "Sign in with GitHub to run this action"}
+              onClick={() =>
+                user
+                  ? runAction("risk", () => recalculateRisk(deployment.id), "Risk score recalculated.")
+                  : login()
+              }
             />
             <ActionButton
               label="Run Sync AI Analysis"
               busyLabel={actionLabels["sync-ai"]}
               isBusy={activeAction === "sync-ai"}
-              disabled={Boolean(activeAction)}
+              disabled={user ? Boolean(activeAction) : false}
+              title={user ? undefined : "Sign in with GitHub to run this action"}
               onClick={() =>
-                runAction("sync-ai", () => runSyncAiAnalysis(deployment.id), "Synchronous AI analysis completed.")
+                user
+                  ? runAction("sync-ai", () => runSyncAiAnalysis(deployment.id), "Synchronous AI analysis completed.")
+                  : login()
               }
             />
             <ActionButton
               label="Queue Async AI Analysis"
               busyLabel={actionLabels["async-ai"]}
               isBusy={activeAction === "async-ai"}
-              disabled={Boolean(activeAction)}
-              onClick={() => runAction("async-ai", () => queueAsyncAiAnalysis(deployment.id), "Async AI analysis job queued.")}
+              disabled={user ? Boolean(activeAction) : false}
+              title={user ? undefined : "Sign in with GitHub to run this action"}
+              onClick={() =>
+                user
+                  ? runAction("async-ai", () => queueAsyncAiAnalysis(deployment.id), "Async AI analysis job queued.")
+                  : login()
+              }
             />
           </div>
         </div>
@@ -210,12 +229,14 @@ function ActionButton({
   isBusy,
   disabled,
   onClick,
+  title,
 }: {
   label: string;
   busyLabel: string;
   isBusy: boolean;
   disabled: boolean;
   onClick: () => void;
+  title?: string;
 }) {
   return (
     <button
@@ -223,6 +244,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      title={title}
       className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {isBusy ? busyLabel : label}

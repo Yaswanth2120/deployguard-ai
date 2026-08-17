@@ -3,6 +3,7 @@ package com.deployguard.api.ai.job;
 import java.util.UUID;
 
 public class AiAnalysisJobNotFoundException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
 
     public AiAnalysisJobNotFoundException(UUID jobId) {
         super("AI analysis job not found: " + jobId);
