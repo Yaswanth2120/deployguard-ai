@@ -242,4 +242,4 @@ RabbitMQ jobs do not complete:
 - No Kubernetes manifests are included.
 - No production-grade SaaS deployment is configured.
 - No credentials or provider secrets are committed.
-- No authentication, multi-tenancy, distributed tracing, or retry/DLQ behavior is implemented yet.
+- No multi-tenancy or distributed tracing is implemented yet.

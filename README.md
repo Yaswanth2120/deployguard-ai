@@ -14,11 +14,12 @@ DeployGuard AI correlates deployments, CI/CD runs, and application logs to detec
 | Backend API | https://deployguard-api-production.up.railway.app |
 | AI service | https://deployguard-ai-production.up.railway.app |
 
-> The hosted demo is a portfolio deployment, not a production SaaS environment. GET endpoints are intentionally public so recruiters can browse without signing in; write endpoints (ingestion, risk recalculation, AI analysis) require GitHub sign-in. Multi-tenancy, per-project role enforcement, distributed tracing, and retry/DLQ behavior are not implemented yet.
+> The hosted demo is a portfolio deployment, not a production SaaS environment. GET endpoints are intentionally public so recruiters can browse without signing in; write endpoints (ingestion, risk recalculation, AI analysis) require GitHub sign-in. Multi-tenancy, per-project role enforcement, and distributed tracing are not implemented yet.
 
 ## Recruiter Quick Links
 
 - [Interview guide](docs/interview-guide.md) — short walkthroughs, design rationale, trade-offs, and likely questions.
+- [AI engineering](docs/ai-engineering.md) — eval harness and results, RAG/agent modes, redaction, grounding, risk model.
 - [Resume bullets](docs/resume-bullets.md) — concise and detailed resume-ready project bullets.
 - [System design](docs/system-design.md) — architecture diagrams, data model, reliability behavior, and scaling notes.
 - [Deployment guide](docs/deployment.md) — Railway/Vercel deployment configuration and container build notes.
@@ -41,16 +42,19 @@ DeployGuard AI creates a single workflow for answering: **what changed, how risk
 
 DeployGuard AI models projects, deployments, CI runs, and application logs in PostgreSQL. The Spring Boot backend computes an explainable deployment risk score from deterministic rules, then sends the same deployment context to a FastAPI AI service for structured incident analysis. AI analysis can run synchronously or asynchronously through RabbitMQ jobs.
 
-The AI service integrates with OpenRouter/NVIDIA Nemotron when an API key is configured. If the model call fails, times out, returns invalid JSON, or no API key exists, the service returns a deterministic fallback response with the same schema.
+The AI service integrates with OpenRouter/NVIDIA Nemotron in four modes: `heuristic`, `single_shot`, `rag` (BM25 retrieval over past incidents and runbooks), and `agent` (a tool loop over logs, CI failures, and the knowledge base). Inputs are redacted for secrets and PII before any model call. Output must match a strict schema with a closed root-cause label set. Evidence the input cannot ground is dropped. On any model failure, a deterministic heuristic analyzer answers instead, and the response records `meta.source = "heuristic"` with the reason. Quality is measured on a 60-case golden eval set in CI. See [docs/ai-engineering.md](docs/ai-engineering.md).
 
 ## Key Features
 
 - **GitHub OAuth authentication:** Authorization Code + PKCE sign-in against GitHub; the API issues a short-lived JWT that gates write endpoints while reads stay public.
-- **Deployment risk scoring:** deterministic score from failed CI, failed tests, ERROR logs, hotfix branches, and production deploys.
+- **Deployment risk scoring:** deterministic rules (one spec, `shared/risk-rules.json`, contract-tested in Java and Python) plus a logistic-regression risk model with per-feature explanations, benchmarked against the rules (currently trained on synthetic data; a GitHub revert-based dataset miner is included).
+- **Evaluation harness:** 60-case golden incident set with core, hard, ambiguous, prompt-injection, and secret-leak slices; accuracy, macro-F1, grounding, injection and leak metrics; optional LLM-as-judge; CI regression gate.
+- **GitHub webhook ingestion:** signed (HMAC-SHA256), idempotent `workflow_run`, `pull_request`, and `deployment_status` events feed CI runs, PRs, and scored deployments.
 - **Incident context model:** projects, deployments, CI/CD runs, application logs, AI summaries, and async jobs stored in PostgreSQL.
 - **Synchronous AI analysis:** immediate incident summary with root cause, evidence, recommended actions, severity, and confidence.
-- **Asynchronous AI jobs:** RabbitMQ-backed queue with `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` job states.
-- **Safe AI fallback:** valid response returned even when OpenRouter is unavailable or unconfigured.
+- **Asynchronous AI jobs:** RabbitMQ-backed queue with `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` states, retry with exponential backoff for transient failures, and a dead-letter queue.
+- **Explicit fallback provenance:** a heuristic analyzer that cites real log lines answers when the model is unavailable; every summary records whether a model or the heuristic produced it, the fallback reason, the prompt version, tokens, and latency.
+- **Observability:** Prometheus `/metrics` on the AI service (analyses by source and reason, latency histogram, tokens, cost, ungrounded evidence, redactions).
 - **Next.js dashboard:** project list, deployment list, deployment detail view, risk badges, AI summaries, and job status.
 - **Demo automation:** seed script and validation script create and verify realistic demo data.
 - **Hosted portfolio deployment:** frontend on Vercel; backend, AI service, PostgreSQL, and RabbitMQ on Railway.
@@ -302,19 +306,17 @@ Deployment configuration details are in [docs/deployment.md](docs/deployment.md)
 
 ## Resume Bullet Examples
 
-- Built **DeployGuard AI**, a production-style DevOps platform using Spring Boot, FastAPI, Next.js, PostgreSQL, and RabbitMQ to correlate deployment, CI/CD, and log signals into explainable deployment risk scores.
-- Designed synchronous and asynchronous AI incident-analysis workflows with OpenRouter/NVIDIA Nemotron integration, deterministic fallback behavior, and persisted AI summary history.
-- Implemented a RabbitMQ-backed job pipeline for AI analysis with `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` states, decoupling model latency from API requests.
-- Deployed a full-stack portfolio demo with Vercel frontend hosting and Railway backend, AI service, PostgreSQL, and RabbitMQ infrastructure.
-
-More examples: [docs/resume-bullets.md](docs/resume-bullets.md).
+See [docs/resume-bullets.md](docs/resume-bullets.md). It lists which numbers are measured and which still need a run with an API key.
 
 ## Repository Structure
 
 ```text
 deployguard-ai/
   backend/deployguard-api/   Spring Boot API, risk engine, AI orchestration
-  ai-service/                FastAPI OpenRouter/Nemotron analysis service
+  ai-service/                FastAPI analysis service (RAG/agent modes, redaction, grounding)
+    evals/                   Golden incident set, scoring, eval runner, CI thresholds
+    ml/                      Risk-model training, synthetic generator, GitHub dataset miner
+  shared/risk-rules.json     Single source of truth for deterministic risk rules
   frontend/                  Next.js dashboard
   infra/                     Docker Compose for local infrastructure
   scripts/                   Demo seed, AI smoke test, E2E validation
@@ -326,9 +328,10 @@ deployguard-ai/
 - Authentication covers sign-in and endpoint gating (GitHub OAuth + PKCE, backend-issued short-lived JWT); it does not yet enforce per-project role membership (viewer/operator/admin) — any authenticated GitHub user can run write actions
 - No multi-tenancy yet
 - Hosted demo exists, but there is no production-grade SaaS deployment
-- No distributed tracing yet
-- No retry or dead-letter queue behavior for failed async jobs
-- Observability is limited to logs and health checks
+- No distributed tracing yet; metrics exist on the AI service only, with no dashboards or alerts
+- LLM-mode eval numbers are not yet recorded (needs an OpenRouter key; the heuristic baseline is measured)
+- The risk model is trained on synthetic data until a real dataset is mined with `ml/mine_github.py`
+- Webhooks use one global secret, not per-project secrets
 - Redis caching is planned but not implemented
 
 ## Security Notes

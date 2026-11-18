@@ -1,6 +1,6 @@
 # Interview Guide
 
-This guide is written to match the actual implementation. Every claim here can be checked against the source in `backend/`, `ai-service/`, and `frontend/`. It avoids any metric the project does not measure (no latency numbers, uptime, traffic, cost savings, or user counts) and any capability the project does not have (no authentication, multi-tenancy, distributed tracing, retry/DLQ behavior, or production-grade SaaS deployment).
+This guide is written to match the actual implementation. Every claim here can be checked against the source in `backend/`, `ai-service/`, and `frontend/`. It avoids any metric the project does not measure (no latency numbers, uptime, traffic, cost savings, or user counts) and any capability the project does not have (no multi-tenancy, distributed tracing, or production-grade SaaS deployment).
 
 ## 30-Second Explanation
 
@@ -18,7 +18,7 @@ This guide is written to match the actual implementation. Every claim here can b
 >
 > There are two ways to run analysis: synchronous, where the backend calls the AI service inline and returns the summary; and asynchronous, where the backend creates a job, publishes to RabbitMQ, and a consumer processes it while the client polls for status. A Next.js dashboard shows projects, deployments, risk, and AI activity.
 >
-> It runs locally with Docker Compose and also has a hosted portfolio demo on Vercel/Railway. There's no auth, multi-tenancy, distributed tracing, or production-grade SaaS hardening yet — those are roadmap items.
+> It runs locally with Docker Compose and also has a hosted portfolio demo on Vercel/Railway. There's no multi-tenancy, distributed tracing, or production-grade SaaS hardening yet; those are roadmap items.
 
 ## Five-Minute Architecture Walkthrough
 
@@ -89,15 +89,15 @@ The fallback returns a deterministic summary, root cause, recommended actions, s
 3. **COMPLETED** — set after the worker writes the `ai_incident_summaries` row; `completed_at` is recorded.
 4. **FAILED** — set if the worker or a downstream call fails; an `error_message` is stored.
 
-There is no automatic retry or dead-letter queue yet — a failed job stays `FAILED` until re-triggered. That's a known limitation, not a hidden feature.
+Transient AI-service failures (`AiServiceUnavailableException`) are retried in the worker with exponential backoff, 3 attempts by default (`AI_ANALYSIS_MAX_ATTEMPTS`). Each attempt increments `attempts`. When retries run out, `AiAnalysisJobFailureRecoverer` marks the job `FAILED` ("Failed after N attempt(s): ...") and rejects the message to `deployment.ai.analysis.dlq`. Permanent errors fail at once and are not retried. Redelivery of a `COMPLETED` job is a no-op.
 
 ## Risk Scoring Logic
 
-`RiskScoringService.calculateAndUpdateRiskScore` is the single source of truth:
+The rules live in `RiskRules` (Java) and `risk_rules.py` (Python). Both are contract-tested against `shared/risk-rules.json`:
 
 - +30 if any related CI run (same project + commit SHA) has status `FAILED`
 - +20 if any related CI run has more than zero failed tests
-- +30 if any log linked to the deployment has level `ERROR`
+- +30 if any log linked to the deployment has level `ERROR` or `FATAL`
 - +10 if the branch name contains `hotfix` (case-insensitive)
 - +10 if the environment is `production` or `prod`
 - score capped at 100
@@ -127,51 +127,56 @@ These are the intended scaling levers, described honestly as design intent rathe
 
 ## Known Limitations
 
-- No authentication or authorization.
+- Authentication exists (GitHub OAuth + PKCE); per-project authorization does not.
 - No multi-tenancy.
 - Hosted portfolio demo exists, but there is no production-grade SaaS deployment.
-- No distributed tracing; observability is local logs and basic health checks.
-- No retry or dead-letter queue for failed async jobs.
+- No distributed tracing. The AI service exposes Prometheus metrics; there are no dashboards or alerts.
+- LLM eval numbers are unrecorded until the eval runs with an API key. The risk model is trained on synthetic data.
 - Evidence and recommended actions are stored as JSON text, not first-class relational structures.
 - Redis caching is planned but not implemented.
 
 ## Future Roadmap
 
-- Authentication and authorization, then multi-tenant organizations.
-- GitHub webhook ingestion and CI/CD provider integrations to replace manual/seeded data.
-- Retry and dead-letter queues for failed async jobs.
-- Distributed tracing and richer metrics.
+- Record LLM eval results (single_shot / rag / agent) and mine a real risk dataset.
+- Per-project authorization, then multi-tenant organizations.
+- Per-project webhook secrets and non-GitHub CI providers.
+- Distributed tracing and dashboards over the existing metrics.
 - Production hardening for the hosted deployment and production-grade secrets management.
 - Better search, filtering, and indexing for logs and deployment history.
 
 ## Likely Interviewer Questions (and Truthful Answers)
 
 **Is the risk score AI-generated?**
-No. The risk score is fully deterministic and rule-based in `RiskScoringService`. The AI is only used for the narrative incident summary, which is separate from the score.
+There are two scores. The backend's deployment score is deterministic (`RiskRules`). The AI service's `/v1/risk-scores` returns a logistic-regression probability with per-feature contributions next to the rule baseline. The model is trained on synthetic data until a real dataset is mined, and I say so up front.
 
 **What happens if you don't have an OpenRouter API key?**
-The AI service runs in fallback mode and returns a deterministic summary keyed to the risk level. The platform is fully usable without a key — that's intentional for local development and demos.
+The heuristic analyzer answers. It classifies from log/CI patterns and cites real lines as evidence. The response says `meta.source = "heuristic"` with `fallbackReason = "no_api_key"`, and the UI labels it. It is never presented as model output.
 
 **How do you know the AI output is grounded?**
-The system prompt restricts the model to the provided deployment/CI/log/risk data and tells it not to invent facts, and the service validates that the response is JSON with exactly the expected keys. It does not independently verify the model's claims beyond that, and the smoke test only checks response shape, not which model produced the text. I'd call that a known limitation rather than a guarantee.
+Three layers:
+1. Each evidence item must share ≥60% of its content tokens with a single input line or CI record. If not, it is dropped and counted (`meta.droppedEvidence`, `deployguard_ungrounded_evidence_total`).
+2. The output must match an exact key set and a closed category enum.
+3. The eval harness measures hallucinated-evidence rate, injection-follow rate and secret-leak rate on a 60-case golden set.
+
+Token overlap is a proxy: it catches fabricated evidence, not a wrong conclusion drawn from real evidence. The category-accuracy metric covers that.
 
 **Why both sync and async? Isn't that redundant?**
 They serve different callers. Sync is for "I need the summary now." Async is for decoupling and scale. Building both also demonstrates the trade-off explicitly rather than picking one and hiding the other.
 
 **Does it retry failed jobs?**
-Not yet. A failed job is marked `FAILED` with an error message. Retry and a dead-letter queue are on the roadmap.
+Yes, transient AI-service failures only: exponential backoff, 3 attempts, then the job is marked FAILED and the message dead-lettered. I verified this against a live RabbitMQ by stopping the AI service: the job ended `FAILED` after 3 attempts and the DLQ held 1 message.
 
 **Is this deployed anywhere / how much traffic does it handle?**
 Yes, there is a hosted portfolio demo on Vercel/Railway. It is not a production SaaS system and there is no measured production traffic, latency, throughput, or uptime, so I won't claim those numbers.
 
 **Is there authentication?**
-No. No auth, no multi-tenancy. Those are explicitly out of current scope and on the roadmap.
+Yes: GitHub OAuth with PKCE, and the backend issues a JWT that gates writes. There is no per-project authorization and no multi-tenancy. Webhooks are authenticated separately by HMAC signature.
 
 **Why a separate AI service instead of calling the model from Spring Boot?**
 Isolation. The model dependency is the least reliable part of the system, so it lives behind its own service with its own fallback. The backend can treat AI as an optional, swappable dependency, and the Python ecosystem is a better fit for model-facing code.
 
 **How would you scale the async path?**
-Run multiple RabbitMQ consumers, keep backend instances stateless, add database indexes for hot lookups, and treat OpenRouter quotas as a capacity limit. I'd also add retries with a dead-letter queue before scaling load.
+Run multiple RabbitMQ consumers, keep backend instances stateless, add database indexes for hot lookups, and treat OpenRouter quotas as a capacity limit. Retries and the DLQ already bound the damage from a slow provider. Next I'd add a per-provider concurrency limit.
 
 **What would you build next?**
-GitHub webhook and CI/CD ingestion so the data isn't manual/seeded, then retries/DLQ for reliability, then authentication and production hardening for the hosted demo.
+Run the LLM eval and publish the numbers. Mine a real revert-labeled dataset and retrain the risk model. Then add an embedding retriever with its own recall@k eval.

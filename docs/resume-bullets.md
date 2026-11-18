@@ -1,63 +1,33 @@
 # Resume Bullets
 
-Every bullet below is truthful against the implementation. None of them claim production usage, traffic, latency, uptime, cost savings, or user counts, because the project does not measure those. Use the ones that fit the role.
+Rule for every bullet: a number appears only if a script in this repository produced it. Numbers marked **[run first]** do not exist yet. Produce them before using the bullet. Don't estimate them.
 
-## Three Concise Bullets
+## AI Engineer — primary bullets
 
-- Built **DeployGuard AI**, a deployment risk and incident-analysis platform (Spring Boot, FastAPI, Next.js, PostgreSQL, RabbitMQ) with a deterministic rule-based risk engine and AI-assisted incident summaries.
-- Designed both **synchronous and asynchronous** AI analysis paths, using RabbitMQ and a Spring Boot consumer to decouple model calls from API requests via a tracked job lifecycle.
-- Integrated **OpenRouter / NVIDIA Nemotron** for incident summarization with deterministic fallback so the platform stays fully functional with no API key.
+- Built an **LLM incident-triage system** (FastAPI, OpenRouter/Nemotron) with four interchangeable modes: heuristic, single-shot, RAG (BM25 over past incidents and runbooks), and a tool-calling agent (log search, CI failures, knowledge-base lookup). Output uses a strict JSON contract with a closed 11-label root-cause taxonomy.
+- Designed a **60-case golden evaluation set** with core, hard (misleading-keyword), ambiguous, prompt-injection, and secret-leak slices. Scoring covers category accuracy, macro-F1, evidence grounding, injection-follow rate, leak rate, p50/p95 latency, tokens and cost, plus optional LLM-as-judge. A CI gate blocks regressions.
+  - Measured result: the deterministic baseline scores 85% overall and **0/8 on the hard slice**.
+  - **[run first]** Fill in LLM results with `python -m evals.run --mode heuristic --mode single_shot --mode rag --mode agent`, for example "RAG raised hard-slice accuracy from 0% to X% at Y tokens/analysis".
+- Hardened the LLM path for sensitive incident data. Regex redaction (tokens, keys, credentials, PII) runs before every model call and tool output. Untrusted logs are delimited to resist prompt injection. A grounding filter drops evidence the input cannot support and surfaces the drop rate as a metric. Measured on the golden set: **0% secret leak and 0% injection-follow**, heuristic path.
+- Trained a **logistic-regression deployment-risk model** (IRLS in numpy, L2 tuned on validation, ordered split) with training/serving feature parity and per-feature explanations, served without ML dependencies.
+  - On held-out synthetic data it beats the rule baseline: **ROC-AUC 0.79 vs 0.68, PR-AUC 0.37 vs 0.22, ECE 0.010 vs 0.074**.
+  - Say "synthetic". Also built a GitHub miner that labels reverted PRs. **[run first]** mine a public repo before you claim real-data numbers.
+- Made AI provenance first-class. Every summary persists source (model or heuristic), fallback reason, prompt version, tokens, latency and dropped evidence. Prometheus metrics track fallback rate, cost and ungrounded evidence, so model quality is observable in production rather than only offline.
 
-## Five Detailed Bullets
+## Platform / backend bullets
 
-- Architected a local-first monorepo (Spring Boot 3.5 / Java 21 backend, FastAPI AI service, Next.js 15 dashboard, PostgreSQL 16, RabbitMQ) that correlates deployments, CI runs, and application logs into a single relational model managed by Flyway migrations.
-- Implemented a **deterministic risk engine** that scores deployments from explicit additive signals (failed CI, failed tests, ERROR logs, hotfix branches, production environment), capping at 100 and mapping to LOW/MEDIUM/HIGH for explainable, repeatable results independent of any model.
-- Built an **asynchronous AI analysis pipeline** with RabbitMQ: the API enqueues a job and returns immediately, a Spring Boot consumer processes it through a PENDING → PROCESSING → COMPLETED/FAILED lifecycle, and clients poll job status — keeping request latency decoupled from model latency.
-- Developed a **FastAPI AI service** that calls OpenRouter (NVIDIA Nemotron) with a grounded, JSON-only prompt and validates response shape, returning a **deterministic fallback** on missing key, provider error, timeout, or malformed output so the system degrades gracefully.
-- Created a **Next.js / React / TypeScript dashboard** showing projects, deployments, risk levels, and AI activity, backed by documented REST APIs, reproducible demo data via a seed script, and a hosted portfolio deployment on Vercel/Railway.
+- Built a deployment-risk platform (Spring Boot 3.5 / Java 21, FastAPI, Next.js, PostgreSQL, RabbitMQ) that ingests **signed GitHub webhooks** (HMAC-SHA256, delivery-ID idempotency) for workflow runs, pull requests and deployment statuses. When a late CI failure arrives, it re-scores every deployment of that commit.
+- Added **retry with exponential backoff and a dead-letter queue** to the async analysis pipeline. Only transient AI-service errors are retried. Exhausted jobs are marked FAILED with their attempt count and dead-lettered. This was verified end to end against a live RabbitMQ instance.
+- Removed three drifting copies of the risk rules (Java deployment scoring, Java PR scoring, Python) in favor of one versioned spec (`shared/risk-rules.json`), enforced by contract tests in both languages.
 
-## LinkedIn Project Description
+## Interview framing
 
-> **DeployGuard AI — Deployment Risk & Incident Analysis Platform**
->
-> A local-first platform that correlates deployment events, CI/CD results, and application logs to assess release risk and speed up incident triage. A deterministic, rule-based engine scores each deployment from concrete signals (failed CI, error logs, hotfix branches, production targets), while a separate FastAPI service generates AI incident summaries through OpenRouter / NVIDIA Nemotron — with a deterministic fallback so it works with no API key. Supports both synchronous analysis and an asynchronous RabbitMQ job pipeline with a tracked lifecycle.
->
-> Stack: Spring Boot (Java 21), FastAPI (Python), Next.js / React / TypeScript, PostgreSQL, RabbitMQ, Flyway, Docker Compose, Railway, Vercel.
->
-> Scoped honestly as a portfolio project: hosted demo available, but authentication, multi-tenancy, production observability, and production hardening are still on the roadmap.
+- **"Why logistic regression, not XGBoost?"** It has 14 features, needs calibrated probabilities and per-feature explanations, and must serve without ML dependencies. Gradient-boosted trees are the next experiment once real data exists. Compare them on PR-AUC and ECE.
+- **"How do you know the LLM is better than rules?"** Run the hard slice, where keywords mislead and the heuristic scores 0/8. If the LLM modes don't beat that, the LLM isn't earning its cost.
+- **"What stops the model from inventing evidence?"** Grounding: each evidence item must overlap ≥60% with one input line, or it is dropped and counted.
 
-## GitHub Repository Description
+## Do not claim
 
-> Deployment risk & incident-analysis platform: deterministic risk engine + AI incident summaries (OpenRouter/Nemotron with fallback). Spring Boot, FastAPI, Next.js, PostgreSQL, RabbitMQ. Hosted demo on Vercel/Railway.
-
-## STAR Examples
-
-### System Design
-- **Situation:** Deployment risk signals (CI results, logs, deployment history) were conceptually scattered and there was no single view tying a deployed commit to its risk.
-- **Task:** Design a system that unifies these signals and adds both a risk assessment and an AI explanation.
-- **Action:** Modeled projects, deployments, CI runs, logs, AI summaries, and jobs in PostgreSQL with Flyway migrations; put the deterministic risk engine in the Spring Boot backend and isolated model calls in a separate FastAPI service so the unreliable dependency could fail independently.
-- **Result:** A clean separation where the score is explainable and model-free, the AI is optional and swappable, and the data model supports both sync and async analysis from the same context.
-
-### Debugging
-- **Situation:** Model providers don't always return clean JSON — outputs can be wrapped in code fences or contain extra text.
-- **Task:** Make response parsing robust without trusting the model to be well-behaved.
-- **Action:** Wrote `extract_json` to strip code fences and isolate the outermost JSON object, then `validate_response_shape` to require exactly the expected keys, raising on any mismatch so malformed responses fall through to the deterministic fallback.
-- **Result:** Off-schema or fenced model output no longer breaks the pipeline; it degrades to a valid fallback with the identical response schema.
-
-### Reliability
-- **Situation:** The AI dependency is the least reliable part of the system (network, timeouts, rate limits, missing key).
-- **Task:** Ensure the platform stays usable regardless of model availability.
-- **Action:** Implemented `build_fallback_response` keyed to risk level, triggered on missing key, HTTP error, 30s timeout, invalid JSON, or shape mismatch; ensured AI service failures return a clear backend error in the sync path instead of crashing, and mark async jobs `FAILED` with an error message.
-- **Result:** The whole project runs with no API key, and every AI failure mode has a defined, non-crashing outcome.
-
-### Async Architecture
-- **Situation:** Calling the model inline ties request latency to the model and doesn't scale.
-- **Task:** Add an asynchronous path that returns immediately and can scale out.
-- **Action:** Built a RabbitMQ-backed job pipeline: the API inserts a job (PENDING) and publishes a message, a Spring Boot consumer marks it PROCESSING, runs analysis, writes the summary, and marks it COMPLETED or FAILED; clients poll job status. Kept backend instances stateless so consumers can scale horizontally.
-- **Result:** Analysis requests return immediately, model latency is decoupled from the API, and the design supports concurrent consumers with queue depth as backpressure.
-
-### AI Integration
-- **Situation:** AI incident summaries needed to be useful but grounded and safe to store.
-- **Task:** Integrate a model provider without letting the model hallucinate or break the contract.
-- **Action:** Integrated OpenRouter/Nemotron via a constrained system prompt (use only provided data, don't invent facts, return JSON with a fixed key set), requested `json_object` responses, validated shape before persisting, and kept the public response schema identical between real and fallback paths.
-- **Result:** A consistent, validated incident-summary contract that callers and the database treat uniformly regardless of whether a model or the fallback produced it.
+- Production traffic, users, uptime, or incident-reduction percentages. None are measured.
+- Real-world model accuracy. The risk model is trained on synthetic data until mined data exists.
+- Any LLM eval number not taken from `evals/reports/latest.md`.
