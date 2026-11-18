@@ -19,6 +19,13 @@ deployguard:
     base-url: ${AI_SERVICE_BASE_URL:http://localhost:8001}
   cors:
     allowed-origins: ${FRONTEND_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+  github:
+    # Shared secret configured on the GitHub webhook. Blank disables ingestion (endpoint returns 503).
+    webhook-secret: ${GITHUB_WEBHOOK_SECRET:}
+  ai-analysis:
+    max-attempts: ${AI_ANALYSIS_MAX_ATTEMPTS:3}
+    initial-backoff-ms: ${AI_ANALYSIS_INITIAL_BACKOFF_MS:1000}
+    max-backoff-ms: ${AI_ANALYSIS_MAX_BACKOFF_MS:10000}
   auth:
     github:
       client-id: ${GITHUB_CLIENT_ID:}

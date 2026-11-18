@@ -8,7 +8,6 @@ import com.deployguard.api.deployment.DeploymentNotFoundException;
 import com.deployguard.api.deployment.DeploymentRepository;
 import com.deployguard.api.deployment.dto.DeploymentResponse;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,12 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RiskScoringService {
 
-    private static final int FAILED_CI_RISK = 30;
-    private static final int FAILED_TESTS_RISK = 20;
-    private static final int ERROR_LOG_RISK = 30;
-    private static final int HOTFIX_BRANCH_RISK = 10;
-    private static final int PRODUCTION_ENVIRONMENT_RISK = 10;
-    private static final int MAX_RISK_SCORE = 100;
 
     private final DeploymentRepository deploymentRepository;
     private final CiRunRepository ciRunRepository;
@@ -47,56 +40,19 @@ public class RiskScoringService {
                 deployment.getCommitSha()
         );
 
-        int score = 0;
+        List<RiskRules.Factor> factors = RiskRules.factors(
+                deployment.getBranch(),
+                deployment.getEnvironment(),
+                relatedCiRuns.stream().map(CiRun::getStatus).toList(),
+                relatedCiRuns.stream().mapToInt(CiRun::getFailedTests).sum(),
+                applicationLogRepository.findByDeploymentId(deploymentId).stream()
+                        .map(applicationLog -> applicationLog.getLevel())
+                        .toList());
 
-        if (relatedCiRuns.stream().anyMatch(ciRun -> equalsIgnoreCase(ciRun.getStatus(), "FAILED"))) {
-            score += FAILED_CI_RISK;
-        }
-
-        if (relatedCiRuns.stream().anyMatch(ciRun -> ciRun.getFailedTests() > 0)) {
-            score += FAILED_TESTS_RISK;
-        }
-
-        if (applicationLogRepository.findByDeploymentId(deploymentId)
-                .stream()
-                .anyMatch(applicationLog -> equalsIgnoreCase(applicationLog.getLevel(), "ERROR"))) {
-            score += ERROR_LOG_RISK;
-        }
-
-        if (containsIgnoreCase(deployment.getBranch(), "hotfix")) {
-            score += HOTFIX_BRANCH_RISK;
-        }
-
-        if (isProductionEnvironment(deployment.getEnvironment())) {
-            score += PRODUCTION_ENVIRONMENT_RISK;
-        }
-
-        int cappedScore = Math.min(score, MAX_RISK_SCORE);
-        deployment.updateRisk(cappedScore, riskLevel(cappedScore));
+        int score = RiskRules.score(factors);
+        deployment.updateRisk(score, RiskRules.level(score));
 
         return toResponse(deploymentRepository.save(deployment));
-    }
-
-    private boolean isProductionEnvironment(String environment) {
-        return equalsIgnoreCase(environment, "production") || equalsIgnoreCase(environment, "prod");
-    }
-
-    private boolean containsIgnoreCase(String value, String expected) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(expected.toLowerCase(Locale.ROOT));
-    }
-
-    private boolean equalsIgnoreCase(String value, String expected) {
-        return value != null && value.equalsIgnoreCase(expected);
-    }
-
-    private String riskLevel(int score) {
-        if (score <= 30) {
-            return "LOW";
-        }
-        if (score <= 70) {
-            return "MEDIUM";
-        }
-        return "HIGH";
     }
 
     private DeploymentResponse toResponse(Deployment deployment) {

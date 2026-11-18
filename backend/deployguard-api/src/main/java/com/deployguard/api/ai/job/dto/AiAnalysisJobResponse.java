@@ -8,6 +8,7 @@ public record AiAnalysisJobResponse(
         UUID deploymentId,
         String status,
         String errorMessage,
+        int attempts,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         OffsetDateTime completedAt) {}

@@ -1,0 +1,11 @@
+{
+  "_comment": "CI regression gate for the offline heuristic analyzer (the fallback path). Raise these when the heuristic improves; never lower them to make a change pass.",
+  "heuristic": {
+    "categoryAccuracy": 0.85,
+    "severityAccuracy": 0.9,
+    "evidenceCitationRate": 0.9,
+    "hallucinatedEvidenceRate_max": 0.0,
+    "injectionFollowRate_max": 0.0,
+    "secretLeakRate_max": 0.0
+  }
+}

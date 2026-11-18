@@ -1,32 +1,731 @@
-openapi: 3.0.3
-info:
-  title: DeployGuard AI Service
-  version: 0.1.0
-paths:
-  /v1/risk-scores: {post: {operationId: calculateRiskScore, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RiskScoreRequest'}}}}, responses: {'200': {description: Risk score, content: {application/json: {schema: {$ref: '#/components/schemas/RiskScoreResponse'}}}}, '422': {description: Invalid payload}}}}
-components:
-  schemas:
-    PullRequestContext:
-      type: object
-      required: [repositoryId, number, commitSha, sourceBranch, targetBranch]
-      properties: {repositoryId: {type: string}, number: {type: integer}, commitSha: {type: string}, sourceBranch: {type: string}, targetBranch: {type: string}, title: {type: string}}
-    CiRunContext:
-      type: object
-      required: [provider, status]
-      properties: {provider: {type: string}, status: {type: string}, failedTests: {type: integer, minimum: 0}, durationSeconds: {type: integer, minimum: 0}}
-    LogContext:
-      type: object
-      required: [severity, message, timestamp]
-      properties: {severity: {type: string}, message: {type: string}, timestamp: {type: string, format: date-time}}
-    RiskScoreRequest:
-      type: object
-      required: [pullRequest, ciRuns, logs]
-      properties: {pullRequest: {$ref: '#/components/schemas/PullRequestContext'}, ciRuns: {type: array, items: {$ref: '#/components/schemas/CiRunContext'}}, logs: {type: array, items: {$ref: '#/components/schemas/LogContext'}}}
-    RiskFactor:
-      type: object
-      required: [name, contribution]
-      properties: {name: {type: string}, contribution: {type: number}}
-    RiskScoreResponse:
-      type: object
-      required: [score, riskLevel, rationale, factors, modelVersion]
-      properties: {score: {type: integer, minimum: 0, maximum: 100}, riskLevel: {type: string, enum: [LOW, MEDIUM, HIGH]}, rationale: {type: string}, factors: {type: array, items: {$ref: '#/components/schemas/RiskFactor'}}, modelVersion: {type: string}}
+# Generated from the FastAPI app: PYTHONPATH=. python -c "import json; from app.main import app; print(json.dumps(app.openapi(), indent=2))"
+# JSON is valid YAML 1.2.
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DeployGuard AI Service",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyze-incident": {
+      "post": {
+        "summary": "Analyze Incident Endpoint",
+        "operationId": "analyze_incident_endpoint_analyze_incident_post",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "heuristic",
+                    "single_shot",
+                    "rag",
+                    "agent"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Override ANALYSIS_MODE for this request.",
+              "title": "Mode"
+            },
+            "description": "Override ANALYSIS_MODE for this request."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentAnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentAnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/risk-scores": {
+      "post": {
+        "summary": "Risk Score Endpoint",
+        "operationId": "risk_score_endpoint_v1_risk_scores_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskScoreResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Metrics Endpoint",
+        "operationId": "metrics_endpoint_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisMeta": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "model",
+              "heuristic"
+            ],
+            "title": "Source"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "heuristic",
+              "single_shot",
+              "rag",
+              "agent"
+            ],
+            "title": "Mode"
+          },
+          "fallbackReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallbackreason"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "promptVersion": {
+            "type": "string",
+            "title": "Promptversion"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "title": "Latencyms",
+            "default": 0
+          },
+          "promptTokens": {
+            "type": "integer",
+            "title": "Prompttokens",
+            "default": 0
+          },
+          "completionTokens": {
+            "type": "integer",
+            "title": "Completiontokens",
+            "default": 0
+          },
+          "estimatedCostUsd": {
+            "type": "number",
+            "title": "Estimatedcostusd",
+            "default": 0.0
+          },
+          "toolCalls": {
+            "type": "integer",
+            "title": "Toolcalls",
+            "default": 0
+          },
+          "redactions": {
+            "type": "integer",
+            "title": "Redactions",
+            "default": 0
+          },
+          "droppedEvidence": {
+            "type": "integer",
+            "title": "Droppedevidence",
+            "default": 0
+          },
+          "retrievedDocuments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retrieveddocuments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "mode",
+          "promptVersion"
+        ],
+        "title": "AnalysisMeta",
+        "description": "Provenance and telemetry for one analysis. Never contains prompt text or raw input."
+      },
+      "CiRunContext": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "failedTests": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failedtests",
+            "default": 0
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Durationseconds",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "status"
+        ],
+        "title": "CiRunContext"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "service"
+        ],
+        "title": "HealthResponse"
+      },
+      "IncidentAnalysisRequest": {
+        "properties": {
+          "deployment": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Deployment"
+          },
+          "ciRuns": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Ciruns"
+          },
+          "logs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Logs"
+          },
+          "riskScore": {
+            "type": "integer",
+            "title": "Riskscore",
+            "default": 0
+          },
+          "riskLevel": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "title": "Risklevel",
+            "default": "LOW"
+          }
+        },
+        "type": "object",
+        "title": "IncidentAnalysisRequest"
+      },
+      "IncidentAnalysisResponse": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "likelyRootCause": {
+            "type": "string",
+            "title": "Likelyrootcause"
+          },
+          "rootCauseCategory": {
+            "type": "string",
+            "enum": [
+              "BAD_MIGRATION",
+              "CONFIG_ERROR",
+              "DEPENDENCY_REGRESSION",
+              "RESOURCE_EXHAUSTION",
+              "DOWNSTREAM_TIMEOUT",
+              "AUTH_FAILURE",
+              "CODE_DEFECT",
+              "TEST_FAILURE",
+              "INFRASTRUCTURE",
+              "NO_INCIDENT",
+              "INSUFFICIENT_EVIDENCE"
+            ],
+            "title": "Rootcausecategory"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "recommendedActions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommendedactions"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "title": "Confidence"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "likelyRootCause",
+          "rootCauseCategory",
+          "evidence",
+          "recommendedActions",
+          "severity",
+          "confidence"
+        ],
+        "title": "IncidentAnalysisResponse"
+      },
+      "LogContext": {
+        "properties": {
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "severity",
+          "message",
+          "timestamp"
+        ],
+        "title": "LogContext"
+      },
+      "PullRequestContext": {
+        "properties": {
+          "repositoryId": {
+            "type": "string",
+            "title": "Repositoryid"
+          },
+          "number": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Number"
+          },
+          "commitSha": {
+            "type": "string",
+            "title": "Commitsha"
+          },
+          "sourceBranch": {
+            "type": "string",
+            "title": "Sourcebranch"
+          },
+          "targetBranch": {
+            "type": "string",
+            "title": "Targetbranch"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "additions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Additions",
+            "default": 0
+          },
+          "deletions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Deletions",
+            "default": 0
+          },
+          "changedFiles": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Changedfiles",
+            "default": 0
+          },
+          "touchesMigrations": {
+            "type": "boolean",
+            "title": "Touchesmigrations",
+            "default": false
+          },
+          "touchesConfig": {
+            "type": "boolean",
+            "title": "Touchesconfig",
+            "default": false
+          },
+          "testFilesChanged": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Testfileschanged",
+            "default": 0
+          },
+          "authorPriorMergedPrs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Authorpriormergedprs",
+            "default": 0
+          },
+          "targetEnvironment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetenvironment"
+          },
+          "mergedAtHourUtc": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 23.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mergedathourutc"
+          },
+          "mergedOnWeekend": {
+            "type": "boolean",
+            "title": "Mergedonweekend",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "repositoryId",
+          "number",
+          "commitSha",
+          "sourceBranch",
+          "targetBranch"
+        ],
+        "title": "PullRequestContext"
+      },
+      "RiskFactor": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "contribution",
+          "detail"
+        ],
+        "title": "RiskFactor"
+      },
+      "RiskScoreRequest": {
+        "properties": {
+          "pullRequest": {
+            "$ref": "#/components/schemas/PullRequestContext"
+          },
+          "ciRuns": {
+            "items": {
+              "$ref": "#/components/schemas/CiRunContext"
+            },
+            "type": "array",
+            "title": "Ciruns"
+          },
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/LogContext"
+            },
+            "type": "array",
+            "title": "Logs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pullRequest",
+          "ciRuns",
+          "logs"
+        ],
+        "title": "RiskScoreRequest"
+      },
+      "RiskScoreResponse": {
+        "properties": {
+          "score": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "riskLevel": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "title": "Risklevel"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/RiskFactor"
+            },
+            "type": "array",
+            "title": "Factors"
+          },
+          "modelVersion": {
+            "type": "string",
+            "title": "Modelversion"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability"
+          },
+          "baselineScore": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Baselinescore"
+          },
+          "baselineRiskLevel": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "title": "Baselinerisklevel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "riskLevel",
+          "rationale",
+          "factors",
+          "modelVersion",
+          "baselineScore",
+          "baselineRiskLevel"
+        ],
+        "title": "RiskScoreResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

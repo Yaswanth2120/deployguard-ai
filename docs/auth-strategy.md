@@ -4,7 +4,7 @@
 
 Implemented: GitHub OAuth (Authorization Code + PKCE) sign-in, backend-issued short-lived JWT `Bearer` sessions, and endpoint gating (GET is public, write endpoints require a valid token). See `backend/deployguard-api/src/main/java/com/deployguard/api/auth/` and `frontend/lib/AuthProvider.tsx`.
 
-Not yet implemented: per-project role membership checks (the `viewer`/`operator`/`admin` roles below are aspirational — every authenticated GitHub user currently gets full write access), the GitHub/CI webhook signature verification described below, and true OIDC (GitHub's OAuth App flow does not issue an `id_token` or expose a discovery document; the backend fills that gap by minting its own signed session JWT after fetching the GitHub user profile).
+Not yet implemented: per-project role membership checks (the `viewer`/`operator`/`admin` roles below are aspirational — every authenticated GitHub user currently gets full write access), per-project webhook secrets (a single `GITHUB_WEBHOOK_SECRET` is used today; HMAC-SHA256 verification and `X-GitHub-Delivery` idempotency are implemented in `webhook/`), and true OIDC (GitHub's OAuth App flow does not issue an `id_token` or expose a discovery document; the backend fills that gap by minting its own signed session JWT after fetching the GitHub user profile).
 
 ## Trust boundaries
 

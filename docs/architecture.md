@@ -35,4 +35,4 @@ GitHub / CI/CD / Deployments / Logs
 
 ## Current Scope
 
-The repository currently includes the Spring Boot backend, FastAPI AI service, Next.js frontend, PostgreSQL, RabbitMQ, risk scoring, AI analysis endpoints, GitHub OAuth authentication for write endpoints, and local demo scripts. Multi-tenancy, per-project role enforcement, distributed tracing, and Redis are not implemented.
+The repository currently includes the Spring Boot backend, FastAPI AI service, Next.js frontend, PostgreSQL, RabbitMQ, risk scoring, AI analysis endpoints, GitHub OAuth authentication for write endpoints, signed GitHub webhook ingestion, RabbitMQ retry/DLQ, an AI eval harness, and local demo scripts. Multi-tenancy, per-project role enforcement, distributed tracing, and Redis are not implemented.

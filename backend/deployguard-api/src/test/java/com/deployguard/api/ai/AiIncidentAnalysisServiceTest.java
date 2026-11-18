@@ -132,10 +132,26 @@ class AiIncidentAnalysisServiceTest {
                         {
                           "summary": "Incident summary",
                           "likelyRootCause": "Failed tests and error logs",
+                          "rootCauseCategory": "TEST_FAILURE",
                           "evidence": ["CI failed", "ERROR log found"],
                           "recommendedActions": ["Review CI", "Check logs"],
                           "severity": "HIGH",
-                          "confidence": "MEDIUM"
+                          "confidence": "MEDIUM",
+                          "meta": {
+                            "source": "model",
+                            "mode": "rag",
+                            "fallbackReason": null,
+                            "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+                            "promptVersion": "incident-v2.0",
+                            "latencyMs": 2140,
+                            "promptTokens": 1830,
+                            "completionTokens": 240,
+                            "estimatedCostUsd": 0.0,
+                            "toolCalls": 0,
+                            "redactions": 1,
+                            "droppedEvidence": 0,
+                            "retrievedDocuments": ["KB-008"]
+                          }
                         }
                         """, MediaType.APPLICATION_JSON));
 
@@ -149,10 +165,52 @@ class AiIncidentAnalysisServiceTest {
         assertThat(response.severity()).isEqualTo("HIGH");
         assertThat(response.confidence()).isEqualTo("MEDIUM");
         assertThat(response.modelName()).isEqualTo("nvidia/nemotron-3-ultra-550b-a55b:free");
+        assertThat(response.rootCauseCategory()).isEqualTo("TEST_FAILURE");
+        assertThat(response.source()).isEqualTo("model");
+        assertThat(response.analysisMode()).isEqualTo("rag");
+        assertThat(response.promptVersion()).isEqualTo("incident-v2.0");
+        assertThat(response.promptTokens()).isEqualTo(1830);
+        assertThat(response.latencyMs()).isEqualTo(2140);
 
         ArgumentCaptor<AiIncidentSummary> summaryCaptor = ArgumentCaptor.forClass(AiIncidentSummary.class);
         verify(aiIncidentSummaryRepository).save(summaryCaptor.capture());
         assertThat(summaryCaptor.getValue().getDeployment()).isEqualTo(deployment);
+        mockServer.verify();
+    }
+
+    @Test
+    void analyzeDeploymentRecordsHeuristicFallbackProvenance() {
+        Deployment deployment = deployment();
+        UUID deploymentId = deployment.getId();
+        Project project = deployment.getProject();
+
+        when(deploymentRepository.findById(deploymentId)).thenReturn(Optional.of(deployment));
+        when(ciRunRepository.findByProjectIdAndCommitSha(project.getId(), deployment.getCommitSha()))
+                .thenReturn(List.of());
+        when(applicationLogRepository.findByDeploymentId(deploymentId)).thenReturn(List.of());
+        when(aiIncidentSummaryRepository.save(any(AiIncidentSummary.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockServer.expect(requestTo(AI_SERVICE_BASE_URL + "/analyze-incident"))
+                .andRespond(withSuccess("""
+                        {
+                          "summary": "Not enough deployment context to determine a root cause.",
+                          "likelyRootCause": "Insufficient evidence.",
+                          "rootCauseCategory": "INSUFFICIENT_EVIDENCE",
+                          "evidence": [],
+                          "recommendedActions": ["Collect logs"],
+                          "severity": "HIGH",
+                          "confidence": "LOW",
+                          "meta": {"source": "heuristic", "mode": "rag", "fallbackReason": "timeout",
+                                   "model": null, "promptVersion": "incident-v2.0", "latencyMs": 30012}
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        AiIncidentSummaryResponse response = aiIncidentAnalysisService.analyzeDeployment(deploymentId);
+
+        assertThat(response.source()).isEqualTo("heuristic");
+        assertThat(response.fallbackReason()).isEqualTo("timeout");
+        assertThat(response.modelName()).isEqualTo("deployguard-heuristic");
         mockServer.verify();
     }
 

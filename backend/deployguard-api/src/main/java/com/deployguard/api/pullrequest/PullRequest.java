@@ -26,6 +26,9 @@ public class PullRequest {
     public PullRequest(Project project, String provider, String providerPullRequestId, Integer number, String title, String authorId, String sourceBranch, String targetBranch, String commitSha, String status) {
         this.project = project; this.provider = provider; this.providerPullRequestId = providerPullRequestId; this.number = number; this.title = title; this.authorId = authorId; this.sourceBranch = sourceBranch; this.targetBranch = targetBranch; this.commitSha = commitSha; this.status = status;
     }
+    public void syncFromProvider(String title, String commitSha, String status) {
+        this.title = title; this.commitSha = commitSha; this.status = status; this.updatedAt = OffsetDateTime.now();
+    }
     @PrePersist void prePersist() { createdAt = OffsetDateTime.now(); updatedAt = createdAt; }
     public UUID getId() { return id; } public Project getProject() { return project; } public String getProvider() { return provider; } public String getProviderPullRequestId() { return providerPullRequestId; } public Integer getNumber() { return number; } public String getTitle() { return title; } public String getAuthorId() { return authorId; } public String getSourceBranch() { return sourceBranch; } public String getTargetBranch() { return targetBranch; } public String getCommitSha() { return commitSha; } public String getStatus() { return status; } public OffsetDateTime getCreatedAt() { return createdAt; } public OffsetDateTime getUpdatedAt() { return updatedAt; }
 }

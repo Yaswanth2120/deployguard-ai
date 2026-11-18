@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.deployguard.api.ai.AiIncidentAnalysisService;
+import com.deployguard.api.ai.AiServiceUnavailableException;
 import com.deployguard.api.deployment.Deployment;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,6 +63,47 @@ class AiAnalysisJobWorkerTest {
         assertThat(job.getErrorMessage()).isEqualTo("AI service unavailable");
         assertThat(job.getCompletedAt()).isNull();
         verify(aiAnalysisJobRepository, org.mockito.Mockito.times(2)).save(any(AiAnalysisJob.class));
+    }
+
+    @Test
+    void transientFailureIsRecordedAndRethrownForRetry() {
+        AiAnalysisJob job = job();
+        UUID jobId = job.getId();
+        UUID deploymentId = job.getDeployment().getId();
+        when(aiAnalysisJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        doThrow(new AiServiceUnavailableException("AI service is unavailable.", null))
+                .when(aiIncidentAnalysisService)
+                .analyzeDeployment(deploymentId);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> worker().process(new AiAnalysisJobMessage(jobId, deploymentId)))
+                .isInstanceOf(AiServiceUnavailableException.class);
+
+        assertThat(job.getStatus()).isEqualTo(AiAnalysisJobStatus.PROCESSING);
+        assertThat(job.getAttempts()).isEqualTo(1);
+        assertThat(job.getErrorMessage()).isEqualTo("Attempt 1 failed: AI service is unavailable.");
+    }
+
+    @Test
+    void duplicateDeliveryOfCompletedJobIsIgnored() {
+        AiAnalysisJob job = job();
+        job.markCompleted();
+        when(aiAnalysisJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+
+        worker().process(new AiAnalysisJobMessage(job.getId(), job.getDeployment().getId()));
+
+        org.mockito.Mockito.verifyNoInteractions(aiIncidentAnalysisService);
+        assertThat(job.getAttempts()).isZero();
+    }
+
+    @Test
+    void missingJobIsRejectedWithoutRequeue() {
+        UUID jobId = UUID.randomUUID();
+        when(aiAnalysisJobRepository.findById(jobId)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> worker().process(new AiAnalysisJobMessage(jobId, UUID.randomUUID())))
+                .isInstanceOf(org.springframework.amqp.AmqpRejectAndDontRequeueException.class);
     }
 
     private AiAnalysisJobWorker worker() {

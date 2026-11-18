@@ -4,6 +4,25 @@ from pydantic import BaseModel, Field
 
 RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 ConfidenceLevel = Literal["LOW", "MEDIUM", "HIGH"]
+AnalysisSource = Literal["model", "heuristic"]
+AnalysisMode = Literal["heuristic", "single_shot", "rag", "agent"]
+
+# Closed set of root-cause categories. A closed label space makes model output
+# scoreable against the golden evaluation set (see evals/).
+RootCauseCategory = Literal[
+    "BAD_MIGRATION",
+    "CONFIG_ERROR",
+    "DEPENDENCY_REGRESSION",
+    "RESOURCE_EXHAUSTION",
+    "DOWNSTREAM_TIMEOUT",
+    "AUTH_FAILURE",
+    "CODE_DEFECT",
+    "TEST_FAILURE",
+    "INFRASTRUCTURE",
+    "NO_INCIDENT",
+    "INSUFFICIENT_EVIDENCE",
+]
+ROOT_CAUSE_CATEGORIES: tuple[str, ...] = RootCauseCategory.__args__  # type: ignore[attr-defined]
 
 
 class HealthResponse(BaseModel):
@@ -19,9 +38,41 @@ class IncidentAnalysisRequest(BaseModel):
     riskLevel: RiskLevel = "LOW"
 
 
+class AnalysisMeta(BaseModel):
+    """Provenance and telemetry for one analysis. Never contains prompt text or raw input."""
+
+    source: AnalysisSource
+    mode: AnalysisMode
+    fallbackReason: str | None = None
+    model: str | None = None
+    promptVersion: str
+    latencyMs: int = 0
+    promptTokens: int = 0
+    completionTokens: int = 0
+    estimatedCostUsd: float = 0.0
+    toolCalls: int = 0
+    redactions: int = 0
+    droppedEvidence: int = 0
+    retrievedDocuments: list[str] = Field(default_factory=list)
+
+
 class IncidentAnalysisResponse(BaseModel):
     summary: str
     likelyRootCause: str
+    rootCauseCategory: RootCauseCategory
+    evidence: list[str]
+    recommendedActions: list[str]
+    severity: RiskLevel
+    confidence: ConfidenceLevel
+    meta: AnalysisMeta | None = None
+
+
+class ModelIncidentOutput(BaseModel):
+    """Exact shape the LLM must return. Validated before anything is persisted."""
+
+    summary: str = Field(min_length=1)
+    likelyRootCause: str = Field(min_length=1)
+    rootCauseCategory: RootCauseCategory
     evidence: list[str]
     recommendedActions: list[str]
     severity: RiskLevel
@@ -35,6 +86,17 @@ class PullRequestContext(BaseModel):
     sourceBranch: str
     targetBranch: str
     title: str = ""
+    # Change-shape features. Optional so the rule baseline still works without them.
+    additions: int = Field(default=0, ge=0)
+    deletions: int = Field(default=0, ge=0)
+    changedFiles: int = Field(default=0, ge=0)
+    touchesMigrations: bool = False
+    touchesConfig: bool = False
+    testFilesChanged: int = Field(default=0, ge=0)
+    authorPriorMergedPrs: int = Field(default=0, ge=0)
+    targetEnvironment: str | None = None
+    mergedAtHourUtc: int | None = Field(default=None, ge=0, le=23)
+    mergedOnWeekend: bool = False
 
 
 class CiRunContext(BaseModel):
@@ -58,7 +120,7 @@ class RiskScoreRequest(BaseModel):
 
 class RiskFactor(BaseModel):
     name: str
-    contribution: int
+    contribution: float
     detail: str
 
 
@@ -68,3 +130,6 @@ class RiskScoreResponse(BaseModel):
     rationale: str
     factors: list[RiskFactor]
     modelVersion: str
+    probability: float | None = Field(default=None, ge=0.0, le=1.0)
+    baselineScore: int = Field(ge=0, le=100)
+    baselineRiskLevel: RiskLevel

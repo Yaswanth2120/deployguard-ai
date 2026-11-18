@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      llm_eval:
+        description: "Also run the LLM eval (single_shot, rag, agent). Requires the OPENROUTER_API_KEY secret."
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -24,19 +30,52 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: ai-service/requirements.txt
+          cache-dependency-path: ai-service/requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Lint Python files
-        run: ruff check app tests
+        run: ruff check app ml evals tests
 
-      - name: Run tests
+      - name: Run tests (includes eval regression gate and shared risk-rule contract)
         run: PYTHONPATH=. pytest
 
-      - name: Smoke test health endpoint
+      - name: Heuristic eval report
+        run: PYTHONPATH=. python -m evals.run --mode heuristic
+
+      - name: Upload eval report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-heuristic
+          path: ai-service/evals/reports/
+
+      - name: Smoke test health and metrics endpoints
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8001 &
           sleep 3
           curl --fail http://127.0.0.1:8001/health
+          curl --fail http://127.0.0.1:8001/metrics
+
+  llm-eval:
+    name: LLM Eval
+    if: github.event_name == 'workflow_dispatch' && inputs.llm_eval
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-service
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: PYTHONPATH=. python -m evals.run --mode heuristic --mode single_shot --mode rag --mode agent --concurrency 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-llm
+          path: ai-service/evals/reports/

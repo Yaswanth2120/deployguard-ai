@@ -1,19 +1,30 @@
-from app.schemas import RiskFactor, RiskScoreRequest, RiskScoreResponse
+from app.schemas import RiskScoreRequest, RiskScoreResponse
+from app.services.risk_model import load_model
+from app.services.risk_rules import RULES_VERSION, risk_level, rule_score
 
 
 def calculate_risk_score(request: RiskScoreRequest) -> RiskScoreResponse:
-    factors: list[RiskFactor] = []
-    if "hotfix" in request.pullRequest.sourceBranch.lower():
-        factors.append(RiskFactor(name="hotfix_branch", contribution=10, detail="Source branch is a hotfix."))
-    if any(run.status.upper() == "FAILED" for run in request.ciRuns):
-        factors.append(RiskFactor(name="failed_ci_run", contribution=30, detail="At least one CI run failed."))
-    failed_tests = sum(run.failedTests for run in request.ciRuns)
-    if failed_tests:
-        factors.append(RiskFactor(name="failed_tests", contribution=20, detail=f"{failed_tests} failed test(s) reported."))
-    error_logs = sum(1 for log in request.logs if log.severity.upper() in {"ERROR", "FATAL"})
-    if error_logs:
-        factors.append(RiskFactor(name="error_logs", contribution=30, detail=f"{error_logs} error log(s) reported."))
-    score = min(100, sum(factor.contribution for factor in factors))
-    risk_level = "HIGH" if score > 70 else "MEDIUM" if score > 30 else "LOW"
-    rationale = "No risk signals were detected." if not factors else "Deterministic correlation found risk signals in PR, CI, or logs."
-    return RiskScoreResponse(score=score, riskLevel=risk_level, rationale=rationale, factors=factors, modelVersion="deterministic-v1")
+    baseline, rule_factors = rule_score(request)
+    baseline_level = risk_level(baseline)
+    model = load_model()
+
+    if model is None:
+        rationale = "No risk signals were detected." if not rule_factors else "Deterministic rules found risk signals in PR, CI, or logs."
+        return RiskScoreResponse(
+            score=baseline, riskLevel=baseline_level, rationale=rationale, factors=rule_factors,
+            modelVersion=RULES_VERSION, probability=None, baselineScore=baseline, baselineRiskLevel=baseline_level,
+        )
+
+    probability, factors = model.predict(request)
+    score = max(0, min(100, round(probability * 100)))
+    top = ", ".join(f.name for f in factors[:3] if f.contribution > 0) or "no strong risk drivers"
+    return RiskScoreResponse(
+        score=score,
+        riskLevel=risk_level(score),
+        rationale=f"Predicted incident probability {probability:.2f}; top drivers: {top}.",
+        factors=factors,
+        modelVersion=model.version,
+        probability=round(probability, 4),
+        baselineScore=baseline,
+        baselineRiskLevel=baseline_level,
+    )

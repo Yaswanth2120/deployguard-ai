@@ -1,0 +1,95 @@
+{
+  "version": "logreg-v1",
+  "featureNames": [
+    "log_lines_changed",
+    "log_files_changed",
+    "touches_migrations",
+    "touches_config",
+    "test_ratio",
+    "hotfix_branch",
+    "targets_production",
+    "failed_ci",
+    "log_failed_tests",
+    "log_error_logs",
+    "log_ci_duration_min",
+    "off_hours",
+    "weekend",
+    "log_author_experience"
+  ],
+  "mean": [
+    4.509671,
+    1.756778,
+    0.081857,
+    0.154071,
+    0.299945,
+    0.070857,
+    0.449286,
+    0.074071,
+    0.097251,
+    0.152029,
+    2.537442,
+    0.460429,
+    0.123571,
+    3.174083
+  ],
+  "std": [
+    1.22079,
+    0.755419,
+    0.274147,
+    0.361017,
+    0.266744,
+    0.256586,
+    0.497421,
+    0.261887,
+    0.40144,
+    0.356484,
+    0.560551,
+    0.498432,
+    0.329092,
+    1.161948
+  ],
+  "intercept": -2.51667,
+  "coef": [
+    0.511739,
+    -0.006676,
+    0.388997,
+    0.230738,
+    -0.349565,
+    0.085225,
+    0.237613,
+    0.413154,
+    0.087652,
+    0.383949,
+    -0.036596,
+    0.288368,
+    0.104056,
+    -0.350498
+  ],
+  "l2Lambda": 0.0,
+  "trainedAt": "2026-11-18T21:21:45Z",
+  "dataSource": "synthetic-v1",
+  "rows": {
+    "train": 14000,
+    "validation": 3000,
+    "test": 3000,
+    "positiveRate": 0.1105
+  },
+  "testMetrics": {
+    "model": {
+      "rocAuc": 0.7877,
+      "prAuc": 0.3678,
+      "brier": 0.0776,
+      "logLoss": 0.272,
+      "ece": 0.0095,
+      "recallAtPrecision50": 0.2829
+    },
+    "rulesBaseline": {
+      "rocAuc": 0.6789,
+      "prAuc": 0.2219,
+      "brier": 0.0964,
+      "logLoss": 0.5804,
+      "ece": 0.0741,
+      "recallAtPrecision50": 0.125
+    }
+  }
+}

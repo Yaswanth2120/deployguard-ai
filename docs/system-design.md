@@ -159,9 +159,10 @@ OpenRouter / NVIDIA Nemotron
 
 ## Reliability Behavior
 
-- The AI service returns a deterministic fallback response when `OPENROUTER_API_KEY` is missing, OpenRouter fails, a request times out, or the model returns invalid JSON.
+- When `OPENROUTER_API_KEY` is missing, OpenRouter fails or times out, or the model returns invalid or off-schema JSON, the heuristic analyzer answers instead. The response records `meta.source = "heuristic"` and the reason. See [ai-engineering.md](ai-engineering.md).
 - AI service failures do not crash the backend. Synchronous backend analysis returns a clear error when the AI service is unavailable.
-- Asynchronous worker failures mark jobs as `FAILED` and store an error message.
+- Transient async worker failures are retried with exponential backoff (3 attempts). Exhausted jobs are marked `FAILED` with the attempt count and dead-lettered to `deployment.ai.analysis.dlq`. Permanent failures are marked `FAILED` immediately.
+- GitHub webhooks are verified by HMAC-SHA256 and deduplicated by `X-GitHub-Delivery`.
 - Synchronous analysis is simpler for immediate responses, but it ties the client request to downstream AI latency.
 - Asynchronous analysis returns quickly and is more scalable, but clients must poll job status and read summaries later.
 
@@ -180,17 +181,15 @@ OpenRouter / NVIDIA Nemotron
 - No multi-tenancy is implemented.
 - No distributed tracing is implemented.
 - Hosted demo deployment exists, but no production-grade SaaS deployment is implemented yet.
-- No retry or dead-letter queue behavior is documented as implemented.
-- Observability is limited to local logs and basic health checks.
+- Webhooks use a single global secret rather than per-project secrets.
+- Observability: Prometheus metrics on the AI service; no dashboards, alerts, or tracing.
 - Evidence and recommended actions are stored as JSON text rather than first-class relational structures.
 
 ## Future Roadmap
 
 - Per-project role membership enforcement (viewer/operator/admin)
 - Multi-tenant organizations
-- GitHub webhook ingestion
-- CI/CD provider integrations
-- Retry and dead-letter queues for failed async jobs
+- Non-GitHub CI/CD provider integrations and per-project webhook secrets
 - Distributed tracing and richer metrics
 - Production hardening for the hosted deployment
 - Production-grade secrets management

@@ -64,6 +64,15 @@ export type AiIncidentSummary = {
   severity: RiskLevel;
   confidence: RiskLevel;
   modelName: string;
+  rootCauseCategory: string | null;
+  source: "model" | "heuristic" | "unknown";
+  fallbackReason: string | null;
+  analysisMode: string | null;
+  promptVersion: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  latencyMs: number | null;
+  droppedEvidence: number | null;
   createdAt: string;
 };
 
@@ -72,6 +81,7 @@ export type AiAnalysisJob = {
   deploymentId: string;
   status: string;
   errorMessage: string | null;
+  attempts: number;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
