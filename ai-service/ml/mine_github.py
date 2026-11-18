@@ -66,7 +66,7 @@ def find_reverted(prs: list[dict], window_days: int) -> set[int]:
 
 
 def _ts(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(value)
 
 
 class GitHub:

@@ -11,7 +11,7 @@ comparison table to evals/reports/latest.md.
 import argparse
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.llm_client import LlmConfig
@@ -96,7 +96,7 @@ def main() -> None:
     cases = load_cases(args.limit)
 
     results = [asyncio.run(run_mode(mode, cases, args.judge, args.concurrency)) for mode in modes]
-    ran_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    ran_at = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
     REPORTS.mkdir(parents=True, exist_ok=True)
     (REPORTS / f"{ran_at}.json").write_text(json.dumps({"promptVersion": PROMPT_VERSION, "results": results}, indent=2))
     markdown = to_markdown(results, {"ranAt": ran_at, "cases": len(cases)})
