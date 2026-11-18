@@ -71,6 +71,7 @@ public class AiAnalysisJobService {
                 job.getDeployment().getId(),
                 job.getStatus(),
                 job.getErrorMessage(),
+                job.getAttempts(),
                 job.getCreatedAt(),
                 job.getUpdatedAt(),
                 job.getCompletedAt());

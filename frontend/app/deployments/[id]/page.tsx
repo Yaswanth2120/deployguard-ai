@@ -383,13 +383,28 @@ function AiSummaryPanel({ summary }: { summary: AiIncidentSummary | null }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-semibold text-ink">AI incident summary</h2>
-          <p className="mt-1 text-xs text-muted">{summary.modelName} / {formatDateTime(summary.createdAt)}</p>
+          <p className="mt-1 text-xs text-muted">
+            {summary.modelName}
+            {summary.analysisMode ? ` / ${summary.analysisMode}` : ""}
+            {summary.promptVersion ? ` / ${summary.promptVersion}` : ""} / {formatDateTime(summary.createdAt)}
+          </p>
+          {summary.source === "heuristic" ? (
+            <p className="mt-2 inline-block rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+              Heuristic fallback, not model output
+              {summary.fallbackReason ? ` (reason: ${summary.fallbackReason.replaceAll("_", " ")})` : ""}
+            </p>
+          ) : null}
         </div>
         <div className="flex gap-2">
           <RiskBadge level={summary.severity} />
           <StatusBadge status={summary.confidence} />
         </div>
       </div>
+      {summary.rootCauseCategory ? (
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">
+          Category: {summary.rootCauseCategory.replaceAll("_", " ")}
+        </p>
+      ) : null}
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <TextBlock title="Summary" value={summary.summary} />
         <TextBlock title="Likely root cause" value={summary.likelyRootCause} />
@@ -419,6 +434,7 @@ function JobsPanel({ jobs }: { jobs: AiAnalysisJob[] }) {
               <div className="mt-2 text-sm text-muted">
                 Updated {formatDateTime(job.updatedAt)}
                 {job.completedAt ? ` / completed ${formatDateTime(job.completedAt)}` : ""}
+                {job.attempts > 1 ? ` / ${job.attempts} attempts` : ""}
               </div>
               {job.errorMessage ? (
                 <div className="mt-3 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">

@@ -1,5 +1,6 @@
 package com.deployguard.api.ai;
 
+import com.deployguard.api.ai.dto.AiAnalysisMeta;
 import com.deployguard.api.ai.dto.AiIncidentAnalysisResponse;
 import com.deployguard.api.ai.dto.AiIncidentSummaryResponse;
 import com.deployguard.api.applicationlog.ApplicationLog;
@@ -24,7 +25,7 @@ import org.springframework.web.client.RestClientException;
 @Service
 public class AiIncidentAnalysisService {
 
-    private static final String MODEL_NAME = "nvidia/nemotron-3-ultra-550b-a55b:free";
+    private static final String HEURISTIC_MODEL_NAME = "deployguard-heuristic";
 
     private final DeploymentRepository deploymentRepository;
     private final CiRunRepository ciRunRepository;
@@ -62,6 +63,8 @@ public class AiIncidentAnalysisService {
         List<ApplicationLog> logs = applicationLogRepository.findByDeploymentId(deploymentId);
         AiIncidentAnalysisResponse aiResponse = callAiService(deployment, project, ciRuns, logs);
 
+        AiAnalysisMeta meta = aiResponse.meta();
+        String modelName = meta != null && meta.model() != null ? meta.model() : HEURISTIC_MODEL_NAME;
         AiIncidentSummary summary = new AiIncidentSummary(
                 deployment,
                 aiResponse.summary(),
@@ -70,7 +73,21 @@ public class AiIncidentAnalysisService {
                 toJson(aiResponse.recommendedActions()),
                 aiResponse.severity(),
                 aiResponse.confidence(),
-                MODEL_NAME);
+                modelName);
+        if (meta != null) {
+            summary.applyProvenance(
+                    aiResponse.rootCauseCategory(),
+                    meta.source(),
+                    meta.fallbackReason(),
+                    meta.mode(),
+                    meta.promptVersion(),
+                    meta.promptTokens(),
+                    meta.completionTokens(),
+                    meta.latencyMs(),
+                    meta.droppedEvidence());
+        } else {
+            summary.applyProvenance(aiResponse.rootCauseCategory(), "unknown", null, null, null, null, null, null, null);
+        }
 
         return toResponse(aiIncidentSummaryRepository.save(summary));
     }
@@ -181,11 +198,20 @@ public class AiIncidentAnalysisService {
                 summary.getDeployment().getId(),
                 summary.getSummary(),
                 summary.getLikelyRootCause(),
+                summary.getRootCauseCategory(),
                 summary.getEvidence(),
                 summary.getRecommendedActions(),
                 summary.getSeverity(),
                 summary.getConfidence(),
                 summary.getModelName(),
+                summary.getSource(),
+                summary.getFallbackReason(),
+                summary.getAnalysisMode(),
+                summary.getPromptVersion(),
+                summary.getPromptTokens(),
+                summary.getCompletionTokens(),
+                summary.getLatencyMs(),
+                summary.getDroppedEvidence(),
                 summary.getCreatedAt());
     }
 }

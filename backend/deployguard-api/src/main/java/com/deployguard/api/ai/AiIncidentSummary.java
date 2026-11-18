@@ -46,6 +46,33 @@ public class AiIncidentSummary {
     @Column(name = "model_name", nullable = false, length = 120)
     private String modelName;
 
+    @Column(name = "root_cause_category", length = 40)
+    private String rootCauseCategory;
+
+    @Column(nullable = false, length = 20)
+    private String source = "unknown";
+
+    @Column(name = "fallback_reason", length = 60)
+    private String fallbackReason;
+
+    @Column(name = "analysis_mode", length = 20)
+    private String analysisMode;
+
+    @Column(name = "prompt_version", length = 40)
+    private String promptVersion;
+
+    @Column(name = "prompt_tokens")
+    private Integer promptTokens;
+
+    @Column(name = "completion_tokens")
+    private Integer completionTokens;
+
+    @Column(name = "latency_ms")
+    private Integer latencyMs;
+
+    @Column(name = "dropped_evidence")
+    private Integer droppedEvidence;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -142,6 +169,64 @@ public class AiIncidentSummary {
 
     public void setModelName(String modelName) {
         this.modelName = modelName;
+    }
+
+    /** Records which analysis path produced this summary and its telemetry. */
+    public void applyProvenance(
+            String rootCauseCategory,
+            String source,
+            String fallbackReason,
+            String analysisMode,
+            String promptVersion,
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer latencyMs,
+            Integer droppedEvidence) {
+        this.rootCauseCategory = rootCauseCategory;
+        this.source = source == null ? "unknown" : source;
+        this.fallbackReason = fallbackReason;
+        this.analysisMode = analysisMode;
+        this.promptVersion = promptVersion;
+        this.promptTokens = promptTokens;
+        this.completionTokens = completionTokens;
+        this.latencyMs = latencyMs;
+        this.droppedEvidence = droppedEvidence;
+    }
+
+    public String getRootCauseCategory() {
+        return rootCauseCategory;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public String getFallbackReason() {
+        return fallbackReason;
+    }
+
+    public String getAnalysisMode() {
+        return analysisMode;
+    }
+
+    public String getPromptVersion() {
+        return promptVersion;
+    }
+
+    public Integer getPromptTokens() {
+        return promptTokens;
+    }
+
+    public Integer getCompletionTokens() {
+        return completionTokens;
+    }
+
+    public Integer getLatencyMs() {
+        return latencyMs;
+    }
+
+    public Integer getDroppedEvidence() {
+        return droppedEvidence;
     }
 
     public OffsetDateTime getCreatedAt() {

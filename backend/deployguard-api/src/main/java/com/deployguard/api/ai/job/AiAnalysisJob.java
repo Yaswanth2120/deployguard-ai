@@ -40,6 +40,9 @@ public class AiAnalysisJob {
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
 
+    @Column(nullable = false)
+    private int attempts;
+
     public AiAnalysisJob() {
     }
 
@@ -55,6 +58,20 @@ public class AiAnalysisJob {
         this.status = AiAnalysisJobStatus.PROCESSING;
         this.errorMessage = null;
         this.updatedAt = OffsetDateTime.now();
+    }
+
+    public void startAttempt() {
+        this.attempts += 1;
+        markProcessing();
+    }
+
+    public void recordAttemptFailure(String errorMessage) {
+        this.errorMessage = "Attempt " + attempts + " failed: " + errorMessage;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    public int getAttempts() {
+        return attempts;
     }
 
     public void markCompleted() {

@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DeploymentRepository extends JpaRepository<Deployment, UUID> {
 
     List<Deployment> findByProjectId(UUID projectId);
+
+    List<Deployment> findByProjectIdAndCommitSha(UUID projectId, String commitSha);
 }

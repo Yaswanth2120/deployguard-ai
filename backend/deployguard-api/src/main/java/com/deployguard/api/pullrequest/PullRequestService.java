@@ -10,8 +10,8 @@ import com.deployguard.api.pullrequest.dto.PullRequestResponse;
 import com.deployguard.api.pullrequest.dto.RiskFactorResponse;
 import com.deployguard.api.pullrequest.dto.RiskScoreResponse;
 import com.deployguard.api.pullrequest.dto.CreatePullRequestRequest;
+import com.deployguard.api.risk.RiskRules;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -44,24 +44,20 @@ public class PullRequestService {
     @Transactional(readOnly = true)
     public RiskScoreResponse getRiskScore(UUID id) {
         PullRequest pullRequest = pullRequestRepository.findById(id).orElseThrow(() -> new PullRequestNotFoundException(id));
-        List<RiskFactorResponse> factors = new ArrayList<>();
         UUID projectId = pullRequest.getProject().getId();
         List<CiRun> ciRuns = ciRunRepository.findByProjectIdAndCommitSha(projectId, pullRequest.getCommitSha());
-        if (ciRuns.stream().anyMatch(run -> "FAILED".equalsIgnoreCase(run.getStatus()))) {
-            factors.add(new RiskFactorResponse("failed_ci_run", 30, "At least one CI run failed for this commit."));
-        }
-        if (ciRuns.stream().mapToInt(CiRun::getFailedTests).sum() > 0) {
-            factors.add(new RiskFactorResponse("failed_tests", 20, "Failed tests were reported for this commit."));
-        }
-        if (applicationLogRepository.findByDeploymentProjectIdAndDeploymentCommitSha(projectId, pullRequest.getCommitSha())
-                .stream().anyMatch(log -> "ERROR".equalsIgnoreCase(log.getLevel()) || "FATAL".equalsIgnoreCase(log.getLevel()))) {
-            factors.add(new RiskFactorResponse("error_logs", 30, "Error logs are linked to deployments for this commit."));
-        }
-        if (pullRequest.getSourceBranch().toLowerCase().contains("hotfix")) {
-            factors.add(new RiskFactorResponse("hotfix_branch", 10, "Source branch is marked as a hotfix."));
-        }
-        int score = Math.min(100, factors.stream().mapToInt(RiskFactorResponse::contribution).sum());
-        String level = score > 70 ? "HIGH" : score > 30 ? "MEDIUM" : "LOW";
+        List<RiskRules.Factor> ruleFactors = RiskRules.factors(
+                pullRequest.getSourceBranch(),
+                null,
+                ciRuns.stream().map(CiRun::getStatus).toList(),
+                ciRuns.stream().mapToInt(CiRun::getFailedTests).sum(),
+                applicationLogRepository.findByDeploymentProjectIdAndDeploymentCommitSha(projectId, pullRequest.getCommitSha())
+                        .stream().map(log -> log.getLevel()).toList());
+        List<RiskFactorResponse> factors = ruleFactors.stream()
+                .map(factor -> new RiskFactorResponse(factor.name(), factor.contribution(), factor.detail()))
+                .toList();
+        int score = RiskRules.score(ruleFactors);
+        String level = RiskRules.level(score);
         String rationale = factors.isEmpty() ? "No risk signals have been correlated yet." : "Risk was correlated from PR, CI, and deployment-log signals.";
         return new RiskScoreResponse(score, level, rationale, factors, OffsetDateTime.now());
     }
