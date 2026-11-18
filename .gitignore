@@ -13,3 +13,8 @@ node_modules/
 
 __pycache__/
 .venv/
+
+# Generated training data (regenerate with python -m ml.synthetic / ml.mine_github)
+ai-service/ml/data/
+# Timestamped eval run outputs (latest.md is committed)
+ai-service/evals/reports/*.json

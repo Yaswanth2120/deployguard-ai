@@ -1,0 +1,27 @@
+{
+  "version": "deterministic-v2",
+  "description": "Single source of truth for the deterministic risk rules. The Java backend (deployment and pull-request scoring) and the Python AI service (rule baseline) must both match this file; each test suite asserts its constants and the test vectors below against it.",
+  "errorLogLevels": ["ERROR", "FATAL"],
+  "productionEnvironments": ["production", "prod"],
+  "weights": {
+    "failed_ci_run": 30,
+    "failed_tests": 20,
+    "error_logs": 30,
+    "hotfix_branch": 10,
+    "production_environment": 10
+  },
+  "maxScore": 100,
+  "thresholds": {
+    "lowMax": 30,
+    "mediumMax": 70
+  },
+  "testVectors": [
+    {"name": "clean", "branch": "main", "environment": "staging", "ciStatuses": ["SUCCESS"], "failedTests": 0, "logLevels": ["INFO"], "expectedScore": 0, "expectedLevel": "LOW"},
+    {"name": "hotfix-only", "branch": "hotfix/login", "environment": "staging", "ciStatuses": [], "failedTests": 0, "logLevels": [], "expectedScore": 10, "expectedLevel": "LOW"},
+    {"name": "fatal-counts-as-error", "branch": "main", "environment": "staging", "ciStatuses": ["SUCCESS"], "failedTests": 0, "logLevels": ["FATAL"], "expectedScore": 30, "expectedLevel": "LOW"},
+    {"name": "boundary-medium", "branch": "main", "environment": "prod", "ciStatuses": ["SUCCESS"], "failedTests": 0, "logLevels": ["ERROR"], "expectedScore": 40, "expectedLevel": "MEDIUM"},
+    {"name": "boundary-70", "branch": "hotfix/x", "environment": "production", "ciStatuses": ["FAILED"], "failedTests": 1, "logLevels": [], "expectedScore": 70, "expectedLevel": "MEDIUM"},
+    {"name": "high", "branch": "hotfix/x", "environment": "production", "ciStatuses": ["FAILED"], "failedTests": 3, "logLevels": ["ERROR"], "expectedScore": 100, "expectedLevel": "HIGH"},
+    {"name": "capped", "branch": "hotfix/x", "environment": "prod", "ciStatuses": ["FAILED", "FAILED"], "failedTests": 9, "logLevels": ["ERROR", "FATAL"], "expectedScore": 100, "expectedLevel": "HIGH"}
+  ]
+}
