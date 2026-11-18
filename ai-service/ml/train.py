@@ -13,7 +13,7 @@ time-ordered data is never trained on the future.
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -94,7 +94,7 @@ def main() -> None:
         "intercept": round(float(w[0]), 6),
         "coef": w[1:].round(6).tolist(),
         "l2Lambda": lam,
-        "trainedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "trainedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "dataSource": source,
         "rows": {"train": tr, "validation": va - tr, "test": n - va, "positiveRate": round(float(y.mean()), 4)},
         "testMetrics": {"model": test_model, "rulesBaseline": test_rules},

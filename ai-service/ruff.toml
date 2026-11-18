@@ -1,0 +1,2 @@
+# Pin the target so local and CI runs apply the same rules (CI and the Docker image use Python 3.12).
+target-version = "py312"
