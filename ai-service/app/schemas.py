@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 ConfidenceLevel = Literal["LOW", "MEDIUM", "HIGH"]
@@ -69,6 +69,8 @@ class IncidentAnalysisResponse(BaseModel):
 
 class ModelIncidentOutput(BaseModel):
     """Exact shape the LLM must return. Validated before anything is persisted."""
+
+    model_config = ConfigDict(extra="forbid")
 
     summary: str = Field(min_length=1)
     likelyRootCause: str = Field(min_length=1)

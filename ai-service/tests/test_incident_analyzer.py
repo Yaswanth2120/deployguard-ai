@@ -47,9 +47,9 @@ def run(coro):
 def fake_chat(responses, calls=None):
     queue = list(responses)
 
-    async def _chat(config, messages, tools=None, json_mode=True, temperature=0.0):
+    async def _chat(config, messages, tools=None, json_mode=True, temperature=0.0, json_schema=None, tool_choice="auto"):
         if calls is not None:
-            calls.append({"messages": messages, "tools": tools})
+            calls.append({"messages": messages, "tools": tools, "json_schema": json_schema, "tool_choice": tool_choice})
         item = queue.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -183,3 +183,49 @@ def test_endpoint_mode_override_and_metrics() -> None:
     exposition = client.get("/metrics").text
     assert 'deployguard_analysis_total{mode="heuristic",reason="heuristic_mode",source="heuristic"} 1' in exposition
     assert "deployguard_analysis_latency_seconds_bucket" in exposition
+
+
+def test_single_shot_requests_constrained_schema(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(incident_analyzer, "chat", fake_chat([ChatResult(content=model_json())], calls))
+    run(incident_analyzer.analyze_incident(OOM_REQUEST, mode="single_shot", config=CONFIG))
+    schema = calls[0]["json_schema"]
+    assert schema["additionalProperties"] is False
+    assert "RESOURCE_EXHAUSTION" in schema["properties"]["rootCauseCategory"]["enum"]
+
+
+def test_evidence_references_are_replaced_with_exact_lines(monkeypatch) -> None:
+    monkeypatch.setattr(incident_analyzer, "chat", fake_chat([ChatResult(
+        content=model_json(evidence=["[L1]", "[L1] duplicate", "[L99] nonexistent ref", "[CI1]"]))]))
+    response = run(incident_analyzer.analyze_incident(OOM_REQUEST, config=CONFIG))
+    assert response.evidence[0] == "[L1] FATAL: java.lang.OutOfMemoryError: Java heap space"
+    assert response.evidence[1].startswith("[CI1] CI github-actions status SUCCESS")
+    assert len(response.evidence) == 2
+    assert response.meta.droppedEvidence == 1
+
+
+def test_agent_first_step_requires_a_tool_and_repairs_invalid_final(monkeypatch) -> None:
+    calls = []
+    tool_call = {"id": "c1", "type": "function", "function": {"name": "get_log_stats", "arguments": "{}"}}
+    monkeypatch.setattr(agent_module, "chat", fake_chat([
+        ChatResult(content=None, tool_calls=[tool_call]),
+        ChatResult(content="I think it is memory."),
+        ChatResult(content=model_json()),
+    ], calls))
+    response = run(incident_analyzer.analyze_incident(OOM_REQUEST, mode="agent", config=CONFIG))
+    assert calls[0]["tool_choice"] == "required"
+    assert calls[1]["tool_choice"] == "auto"
+    assert calls[2]["tools"] is None and calls[2]["json_schema"] is not None
+    assert response.meta.source == "model"
+
+
+def test_find_changes_reaches_lines_outside_the_overview() -> None:
+    from app.context_builder import build_context
+
+    logs = [{"level": "WARN", "message": f"benign warning {i}"} for i in range(100)]
+    logs.append({"level": "INFO", "message": "requirements.txt bumped python-dateutil 2.8.2 -> 3.0.0 in this release"})
+    request = IncidentAnalysisRequest(logs=logs, riskLevel="HIGH")
+    assert all("dateutil" not in line.message for line in build_context(request).logs)  # hidden from single-shot
+    tools = agent_module.AgentTools(build_context(request, max_log_lines=500, char_budget=200_000))
+    changes = json.loads(tools.dispatch("find_changes", "{}"))["changes"]
+    assert [c["message"] for c in changes] == ["requirements.txt bumped python-dateutil 2.8.2 -> 3.0.0 in this release"]

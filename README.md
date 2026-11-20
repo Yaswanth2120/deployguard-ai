@@ -44,6 +44,20 @@ DeployGuard AI models projects, deployments, CI runs, and application logs in Po
 
 The AI service integrates with OpenRouter/NVIDIA Nemotron in four modes: `heuristic`, `single_shot`, `rag` (BM25 retrieval over past incidents and runbooks), and `agent` (a tool loop over logs, CI failures, and the knowledge base). Inputs are redacted for secrets and PII before any model call. Output must match a strict schema with a closed root-cause label set. Evidence the input cannot ground is dropped. On any model failure, a deterministic heuristic analyzer answers instead, and the response records `meta.source = "heuristic"` with the reason. Quality is measured on a 60-case golden eval set in CI. See [docs/ai-engineering.md](docs/ai-engineering.md).
 
+## Results
+
+Measured on a 139-case incident eval and a 12-case large-incident set, with gpt-oss-120b self-hosted on vLLM, 3 runs per mode. Details: [docs/ai-engineering.md](docs/ai-engineering.md).
+
+| | Keyword heuristic | LLM single-shot | LLM agent |
+| --- | ---: | ---: | ---: |
+| Root-cause accuracy (139 cases) | 62% | **91%** (95% CI 85–95%) | 90% |
+| Hard, misleading-keyword cases (55) | 25% | 85% | 84% |
+| Large incidents (decisive line outside the prompt) | 25% | 33% | **81%** |
+| Prompt-injection followed / secrets leaked | 0 / 0 | 0 / 0 | 0 / 0 |
+| Schema-valid answers / ungrounded evidence | n/a | 100% / 1.6% | 100% / 0.1% |
+
+Compared with Qwen3-30B-A3B on the same GPU, gpt-oss-120b is 11 points more accurate. Qwen is 28% faster, but its agent followed a prompt injection in 6% of adversarial cases.
+
 ## Key Features
 
 - **GitHub OAuth authentication:** Authorization Code + PKCE sign-in against GitHub; the API issues a short-lived JWT that gates write endpoints while reads stay public.

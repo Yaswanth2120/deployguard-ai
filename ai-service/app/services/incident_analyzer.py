@@ -18,7 +18,7 @@ from pydantic import ValidationError
 from app import heuristic
 from app.agent import run_agent
 from app.context_builder import IncidentContext, build_context
-from app.grounding import filter_grounded
+from app.grounding import resolve_evidence
 from app.llm_client import LlmConfig, LlmError, chat
 from app.prompts import PROMPT_VERSION, SYSTEM_PROMPT, build_user_prompt
 from app.retrieval import default_index
@@ -33,6 +33,7 @@ from app.telemetry import record_analysis
 DEFAULT_MODE = "rag"
 VALID_MODES = {"heuristic", "single_shot", "rag", "agent"}
 EXPECTED_RESPONSE_KEYS = set(ModelIncidentOutput.model_fields.keys())
+OUTPUT_SCHEMA = ModelIncidentOutput.model_json_schema()
 AGENT_MAX_LOG_LINES = 500
 AGENT_CHAR_BUDGET = 200_000
 
@@ -69,7 +70,7 @@ async def analyze_incident(
 
     try:
         if mode == "agent":
-            run = await run_agent(config, context)
+            run = await run_agent(config, context, json_schema=OUTPUT_SCHEMA, is_valid_answer=_is_valid)
             raw = run.final.content or ""
             meta.update(
                 toolCalls=run.tool_calls,
@@ -83,7 +84,7 @@ async def analyze_incident(
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(context, docs)},
             ]
-            result = await chat(config, messages)
+            result = await chat(config, messages, json_schema=OUTPUT_SCHEMA)
             raw = result.content or ""
             meta.update(
                 promptTokens=result.prompt_tokens,
@@ -98,7 +99,7 @@ async def analyze_incident(
     except (ValidationError, ValueError, TypeError):
         return _finish_heuristic(context, meta, "schema_mismatch", started)
 
-    grounded, dropped = filter_grounded(output.evidence, context.grounding_corpus())
+    grounded, dropped = resolve_evidence(output.evidence, context.references(), context.grounding_corpus())
     confidence = output.confidence
     if dropped and not grounded and output.rootCauseCategory not in {"NO_INCIDENT", "INSUFFICIENT_EVIDENCE"}:
         confidence = "LOW"
@@ -132,6 +133,14 @@ def _finish(output: ModelIncidentOutput, meta: dict[str, Any], started: float) -
     analysis_meta = AnalysisMeta(**meta)
     record_analysis(analysis_meta.model_dump())
     return IncidentAnalysisResponse(**output.model_dump(), meta=analysis_meta)
+
+
+def _is_valid(raw_response: str) -> bool:
+    try:
+        parse_model_response(raw_response)
+    except (json.JSONDecodeError, ValidationError, ValueError, TypeError):
+        return False
+    return True
 
 
 def parse_model_response(raw_response: str) -> ModelIncidentOutput:

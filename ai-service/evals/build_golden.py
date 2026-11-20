@@ -289,7 +289,9 @@ def build() -> list[dict]:
 
 
 def main() -> None:
-    cases = build()
+    from evals.golden_extra import build_extra
+
+    cases = build() + build_extra(_case)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("".join(json.dumps(c, sort_keys=True) + "\n" for c in cases))
     print(f"wrote {len(cases)} cases to {OUT}")

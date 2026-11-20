@@ -22,3 +22,12 @@ def test_grounding_accepts_quotes_and_rejects_fabrication() -> None:
     )
     assert kept == ["[L1] payments-provider read timed out after 5000ms"]
     assert dropped == 1
+
+
+def test_resolve_evidence_accepts_bracketed_and_bare_ids() -> None:
+    from app.grounding import resolve_evidence
+
+    refs = {"L1": "ERROR: disk full", "CI1": "CI gha status FAILED with 2 failed tests"}
+    kept, dropped = resolve_evidence(["L1", "[CI1] tests", "L1: again", "L12", "LOL text"], refs, ["ERROR disk full"])
+    assert kept == ["[L1] ERROR: disk full", "[CI1] CI gha status FAILED with 2 failed tests"]
+    assert dropped == 2

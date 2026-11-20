@@ -33,6 +33,7 @@ class LlmConfig:
     timeout_seconds: float
     price_per_1k_prompt: float
     price_per_1k_completion: float
+    structured_output: str = "json_schema"
 
     @classmethod
     def from_env(cls) -> "LlmConfig | None":
@@ -46,6 +47,8 @@ class LlmConfig:
             timeout_seconds=float(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "30")),
             price_per_1k_prompt=float(os.getenv("LLM_PRICE_PER_1K_PROMPT_USD", "0")),
             price_per_1k_completion=float(os.getenv("LLM_PRICE_PER_1K_COMPLETION_USD", "0")),
+            # json_schema (constrained decoding) or json_object for providers without schema support.
+            structured_output=os.getenv("LLM_STRUCTURED_OUTPUT", "json_schema"),
         )
 
     def cost(self, prompt_tokens: int, completion_tokens: int) -> float:
@@ -62,6 +65,8 @@ async def chat(
     tools: list[dict[str, Any]] | None = None,
     json_mode: bool = True,
     temperature: float = 0.0,
+    json_schema: dict[str, Any] | None = None,
+    tool_choice: str = "auto",
 ) -> ChatResult:
     payload: dict[str, Any] = {
         "model": config.model,
@@ -70,7 +75,14 @@ async def chat(
     }
     if tools:
         payload["tools"] = tools
-        payload["tool_choice"] = "auto"
+        payload["tool_choice"] = tool_choice
+    elif json_schema is not None and config.structured_output == "json_schema":
+        # Constrained decoding: the server can only emit tokens that keep the output valid
+        # against the schema. Supported by vLLM and by some hosted providers.
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": "incident_analysis", "schema": json_schema, "strict": True},
+        }
     elif json_mode:
         payload["response_format"] = {"type": "json_object"}
 

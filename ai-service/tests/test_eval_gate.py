@@ -12,11 +12,16 @@ THRESHOLDS = json.loads((Path(__file__).resolve().parents[1] / "evals" / "thresh
 
 def test_heuristic_meets_eval_thresholds() -> None:
     summary = asyncio.run(run_mode("heuristic", load_cases()))["summary"]
+    def value(key: str) -> float:
+        if key.startswith("sliceAccuracy."):
+            return summary["sliceAccuracy"][key.split(".", 1)[1]]
+        return summary[key]
+
     for key, bound in THRESHOLDS.items():
         if key.endswith("_max"):
-            assert summary[key[:-4]] <= bound, (key, summary[key[:-4]])
+            assert value(key[:-4]) <= bound, (key, value(key[:-4]))
         else:
-            assert summary[key] >= bound, (key, summary[key])
+            assert value(key) >= bound, (key, value(key))
 
 
 def test_golden_set_has_all_slices() -> None:

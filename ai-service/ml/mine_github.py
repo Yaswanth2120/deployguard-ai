@@ -102,8 +102,11 @@ class GitHub:
 
 
 def build_rows(gh: GitHub, repo: str, max_prs: int, window_days: int) -> list[dict]:
-    prs = [pr for pr in gh.paginate(f"/repos/{repo}/pulls", max_prs, state="closed", sort="created", direction="asc")
+    # Most recent PRs first (CI data on old commits is often pruned), then process in merge order
+    # so author history only counts earlier PRs and the ordered train/test split never sees the future.
+    prs = [pr for pr in gh.paginate(f"/repos/{repo}/pulls", max_prs, state="closed", sort="created", direction="desc")
            if pr.get("merged_at")]
+    prs.sort(key=lambda pr: pr["merged_at"])
     reverted = find_reverted(prs, window_days)
     author_counts: dict[str, int] = {}
     rows = []
