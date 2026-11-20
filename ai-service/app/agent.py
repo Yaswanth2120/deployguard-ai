@@ -6,6 +6,9 @@ context, so tool output never reintroduces secrets.
 """
 
 import json
+import os
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -15,6 +18,12 @@ from app.prompts import AGENT_SYSTEM_PROMPT, build_agent_user_prompt
 from app.retrieval import default_index, tokenize
 
 MAX_STEPS = 6
+_CHANGE_PATTERN = re.compile(
+    r"\b(chang(?:e|ed|es)|bump(?:ed)?|upgrad(?:e|ed)|downgrad(?:e|ed)|migration|lockfile|release|rotat(?:e|ed|ion)|"
+    r"replaced|switched|renamed|removed|enabled|disabled|deploy(?:ed)?|base image|policy|"
+    r"outage|degraded|status page|unreachable|announced)\b|->",
+    re.IGNORECASE,
+)
 MAX_TOOL_RESULT_CHARS = 4_000
 
 TOOLS: list[dict[str, Any]] = [
@@ -32,6 +41,18 @@ TOOLS: list[dict[str, Any]] = [
                 },
                 "required": ["query"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_changes",
+            "description": (
+                "List what changed around this deployment: config, dependency, migration, image, "
+                "credential and infrastructure changes, plus external status signals (outages, "
+                "degraded dependencies). Searches all log lines, including ones not in the overview."
+            ),
+            "parameters": {"type": "object", "properties": {}},
         },
     },
     {
@@ -73,6 +94,7 @@ class AgentRun:
     completion_tokens: int = 0
     retrieved: list[str] = field(default_factory=list)
     trace: list[dict[str, Any]] = field(default_factory=list)
+    final_repairs: int = 0
 
 
 class AgentTools:
@@ -107,6 +129,19 @@ class AgentTools:
                              "message": line.message} for line in top],
         }
 
+    def find_changes(self) -> dict[str, Any]:
+        """Stand-in for a change-event feed (deploy diffs, config history, provider status).
+
+        Real deployments would query those systems directly; here change descriptions arrive
+        as log lines, so this matches change-describing lines across the whole context.
+        """
+        matches = [
+            {"ref": line.id, "level": line.level, "message": line.message}
+            for line in self.context.logs
+            if _CHANGE_PATTERN.search(line.message)
+        ]
+        return {"changes": matches[:25], "total": len(matches)}
+
     def get_ci_failures(self) -> dict[str, Any]:
         return {"failedRuns": self.context.failed_ci_runs(), "totalRuns": len(self.context.ciRuns)}
 
@@ -126,6 +161,7 @@ class AgentTools:
                 "search_logs": self.search_logs,
                 "get_log_stats": self.get_log_stats,
                 "get_ci_failures": self.get_ci_failures,
+                "find_changes": self.find_changes,
                 "search_knowledge_base": self.search_knowledge_base,
             }.get(name)
             if handler is None:
@@ -136,22 +172,40 @@ class AgentTools:
         return json.dumps(result)[:MAX_TOOL_RESULT_CHARS]
 
 
-async def run_agent(config: LlmConfig, context: IncidentContext) -> AgentRun:
+async def run_agent(
+    config: LlmConfig,
+    context: IncidentContext,
+    json_schema: dict[str, Any] | None = None,
+    is_valid_answer: Callable[[str], bool] | None = None,
+) -> AgentRun:
+    """Tool loop, then a schema-constrained final answer.
+
+    The first step uses tool_choice="required" so the agent investigates at least once (in the
+    first eval it answered from the overview 95% of the time). Tool steps cannot be
+    schema-constrained, so if the final free-text answer does not validate, one more call
+    with constrained decoding and no tools produces it.
+    """
     tools = AgentTools(context)
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "user", "content": build_agent_user_prompt(context)},
     ]
     run = AgentRun(final=ChatResult(content=None))
+    require_first = os.getenv("AGENT_REQUIRE_TOOL", "true").lower() == "true"
 
-    for _ in range(MAX_STEPS):
-        result = await chat(config, messages, tools=TOOLS)
+    for step in range(MAX_STEPS):
+        choice = "required" if step == 0 and require_first else "auto"
+        result = await chat(config, messages, tools=TOOLS, tool_choice=choice)
         run.prompt_tokens += result.prompt_tokens
         run.completion_tokens += result.completion_tokens
         if not result.tool_calls:
-            run.final = result
-            run.retrieved = tools.retrieved
-            return run
+            if result.content and (is_valid_answer is None or is_valid_answer(result.content)):
+                run.final = result
+                run.retrieved = tools.retrieved
+                return run
+            if result.content:
+                messages.append({"role": "assistant", "content": result.content})
+            break
         messages.append({"role": "assistant", "content": result.content or "", "tool_calls": result.tool_calls})
         for call in result.tool_calls:
             fn = call.get("function", {})
@@ -160,10 +214,11 @@ async def run_agent(config: LlmConfig, context: IncidentContext) -> AgentRun:
             run.trace.append({"tool": fn.get("name"), "chars": len(output)})
             messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": output})
 
-    messages.append({"role": "user", "content": "Tool budget exhausted. Return the final JSON object now."})
-    result = await chat(config, messages, json_mode=True)
+    messages.append({"role": "user", "content": "Return the final JSON object now, following the output contract."})
+    result = await chat(config, messages, json_schema=json_schema)
     run.prompt_tokens += result.prompt_tokens
     run.completion_tokens += result.completion_tokens
+    run.final_repairs += 1
     if not result.content:
         raise LlmError("agent_no_answer", "Agent produced no final answer.")
     run.final = result

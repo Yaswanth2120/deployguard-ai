@@ -60,6 +60,17 @@ class IncidentContext:
         corpus.append(f"riskScore {self.riskScore} riskLevel {self.riskLevel}")
         return corpus
 
+    def references(self) -> dict[str, str]:
+        """Reference id -> canonical quoted text, for every log line and CI run shown to the model."""
+        refs = {line.id: f"{line.level}: {line.message}" for line in self.logs}
+        for run in self.ciRuns:
+            text = (f"CI {run.get('provider', 'ci')} status {run.get('status')} "
+                    f"with {run.get('failedTests', 0)} failed tests")
+            if run.get("summary"):
+                text += f": {run['summary']}"
+            refs[str(run.get("ref"))] = text
+        return refs
+
     def to_prompt_dict(self) -> dict[str, Any]:
         return {
             "deployment": self.deployment,

@@ -6,15 +6,16 @@ import json
 from app.context_builder import IncidentContext
 from app.schemas import ROOT_CAUSE_CATEGORIES
 
-PROMPT_VERSION = "incident-v2.0"
+PROMPT_VERSION = "incident-v3.1"
 
 OUTPUT_CONTRACT = (
     "Return a single JSON object with exactly these keys: summary, likelyRootCause, "
     "rootCauseCategory, evidence, recommendedActions, severity, confidence.\n"
     f"- rootCauseCategory must be one of: {', '.join(ROOT_CAUSE_CATEGORIES)}.\n"
     "- severity and confidence must each be one of LOW, MEDIUM, HIGH.\n"
-    "- evidence is an array of strings; each item must quote or closely paraphrase a specific "
-    "log line or CI run from the context and start with its reference id, e.g. \"[L3] ...\" or \"[CI1] ...\".\n"
+    "- evidence is an array of strings; each item is the reference id of a log line or CI run that "
+    "supports your conclusion, e.g. \"[L3]\" or \"[CI1]\". Cite only ids that appear in the context; "
+    "the server replaces each id with the exact line text.\n"
     "- recommendedActions is an array of short imperative strings.\n"
     "- If the context does not support a conclusion, use INSUFFICIENT_EVIDENCE and confidence LOW.\n"
     "- If the deployment looks healthy, use NO_INCIDENT."
@@ -37,8 +38,12 @@ SYSTEM_PROMPT = (
 
 AGENT_SYSTEM_PROMPT = (
     SYSTEM_PROMPT
-    + "\nYou can call tools to inspect logs, CI failures, and the knowledge base before answering. "
-    "Call tools only when they add information. When you are done, reply with the final JSON object "
+    + "\nYou can call tools to inspect logs, CI failures, changes, and the knowledge base. Investigate before "
+    "answering. Start with find_changes: incidents right after a deploy are usually caused by something that "
+    "changed, and the visible error is often only a symptom of it. Then form a hypothesis, use "
+    "search_knowledge_base to check it against "
+    "known failure patterns and search_logs to look for evidence that confirms or rules it out, "
+    "including lines not shown in the overview. When you are done, reply with the final JSON object "
     "and no tool calls."
 )
 
@@ -75,13 +80,20 @@ def build_user_prompt(context: IncidentContext, knowledge_docs: list[dict] | Non
     return "\n\n".join(parts)
 
 
+AGENT_OVERVIEW_LINES = 60
+
+
 def build_agent_user_prompt(context: IncidentContext) -> str:
-    return (
-        "Triage this deployment. The full log set is available through the search_logs tool; "
-        "the overview below shows deployment metadata and the highest-severity lines only.\n\n"
-        "<deployment_context>\n" + json.dumps(context.to_prompt_dict(), indent=1, sort_keys=True)
-        + "\n</deployment_context>\n\n"
-        + "<untrusted_logs>\n"
-        + "\n".join(f"[{line.id}] {line.level} x{line.occurrences}: {line.message}" for line in context.logs[:5])
-        + "\n</untrusted_logs>"
-    )
+    """Same bounded view as single-shot (top lines by severity and frequency) plus tool access to the
+    rest. Reference ids match between the overview and search_logs because both come from one context."""
+    shown = context.logs[:AGENT_OVERVIEW_LINES]
+    hidden = len(context.logs) - len(shown)
+    return "\n\n".join([
+        "Triage this deployment. Investigate with tools before answering."
+        + (f" {hidden} lower-priority log lines are not shown; use search_logs to reach them." if hidden else ""),
+        "<deployment_context>\n" + json.dumps(context.to_prompt_dict(), indent=1, sort_keys=True) + "\n</deployment_context>",
+        render_ci(context),
+        "<untrusted_logs>\n"
+        + "\n".join(f"[{line.id}] {line.level} x{line.occurrences}: {line.message}" for line in shown)
+        + "\n</untrusted_logs>",
+    ])
