@@ -114,16 +114,30 @@ Reports go to `evals/reports/latest.md`. CI runs the heuristic eval on every pus
 
 ### Current measured results
 
-| Metric | heuristic |
-| --- | ---: |
-| Category accuracy (all 60) | 0.85 |
-| Category accuracy, hard slice | 0.00 (0/8) |
-| Severity accuracy | 0.95 |
-| Hallucinated-evidence rate | 0.00 |
-| Injection-follow rate | 0.00 |
-| Secret-leak rate | 0.00 |
+Run on 2026-11-20 with `openai/gpt-oss-120b`, self-hosted with vLLM on one A100 80 GB, temperature 0, all 60 cases, one run. Per-case results: `evals/reports/2026-11-20T17-41-16Z.json`.
 
-The LLM modes (`single_shot`, `rag`, `agent`) have **not been run yet**. Running them needs an OpenRouter key. Run the command above and paste the table from `evals/reports/latest.md` here before you quote any LLM number.
+| Metric | heuristic | single_shot | rag | agent |
+| --- | ---: | ---: | ---: | ---: |
+| Category accuracy (all 60) | 0.850 | 0.900 | **0.967** | 0.883 |
+| Category accuracy, hard slice (8) | 0/8 | 6/8 | **8/8** | 5/8 |
+| Category macro-F1 | 0.836 | 0.798 | **0.888** | 0.807 |
+| Severity accuracy | 0.950 | 1.000 | 0.967 | 0.983 |
+| Ungrounded evidence (dropped by guard) | 0.000 | 0.092 | 0.113 | 0.027 |
+| Injection-follow rate | 0 | 0 | 0 | 0 |
+| Secret-leak rate | 0 | 0 | 0 | 0 |
+| Model-answer rate (rest fell back on `schema_mismatch`) | n/a | 0.967 | 1.000 | 0.933 |
+| Latency p50 / p95 (ms) | 0 | 4,898 / 6,600 | 5,503 / 6,966 | 4,822 / 7,006 |
+| Mean prompt / completion tokens | 0 | 766 / 399 | 989 / 433 | 1,008 / 396 |
+| Mean tool calls | 0 | 0 | 0 | 0.05 |
+
+What the numbers say:
+
+- **RAG is the best mode.** Retrieved runbooks lift hard-slice accuracy from 6/8 (single-shot) to 8/8, for about 220 extra prompt tokens and about 0.6 s at p50.
+- **The agent barely uses its tools** (0.05 calls per case). It answers from the 5-line overview, so it sees less context than single-shot and scores lower. This is a design problem in the agent prompt, not evidence that tool use doesn't help.
+- **The grounding guard is doing real work.** It dropped 9–11% of single-shot and RAG evidence items as not traceable to the input. Without it, those items would have been shown as evidence.
+- **Schema failures cause the fallbacks.** 2 single-shot and 4 agent answers failed validation and fell back to the heuristic, with the reason recorded.
+
+Caveats: one run per mode; the hard slice has only 8 cases, so each case moves its accuracy by 12.5 points; the golden set is synthetic.
 
 Read the heuristic number correctly. Its core-slice accuracy is high because the core signatures and the heuristic lexicon describe the same failure vocabulary. The hard slice is the meaningful comparison: the heuristic gets 0/8 there by design.
 
