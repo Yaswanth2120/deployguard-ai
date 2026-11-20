@@ -144,6 +144,29 @@ These are the intended scaling levers, described honestly as design intent rathe
 - Production hardening for the hosted deployment and production-grade secrets management.
 - Better search, filtering, and indexing for logs and deployment history.
 
+## The Eval Iteration Story (tell this one)
+
+This is the strongest story in the project because every step has a number behind it. All files are in `ai-service/evals/reports/`.
+
+1. **First run, 60 cases.** RAG scored 8/8 on the hard slice, which looked like a headline. The Wilson interval for 8/8 is 68–100%, so it proved little.
+2. **Bigger set, 139 cases (55 hard).** RAG fell to the same level as single-shot, about 91% overall. The 8/8 had been luck. *Lesson: size the eval before trusting a win.*
+3. **Failure analysis.** Three problems:
+   - Up to 2.2% of answers failed the schema and fell back.
+   - About 6% of evidence items weren't traceable to the input.
+   - The agent made 0.01 tool calls per case, so it wasn't investigating.
+4. **Iteration 1, reliability.** Schema-constrained decoding in vLLM, plus evidence by reference (the model cites line IDs and the server inserts the exact line).
+   - Result: 100% schema-valid answers and 1.6% ungrounded evidence (0.1% for the agent), with accuracy unchanged.
+   - During this step the agent's ungrounded rate briefly jumped to 15%. A trace showed it cited bare `L1` instead of `[L1]`, copying the format from tool output. That was a parser bug, not hallucination.
+5. **Iteration 2, the agent.** Forcing a first tool call made it investigate, but traces showed it only searched for symptoms ("JWT", "ValueError"), never for what changed in the release.
+   - Fix: a `find_changes` tool, and a prompt telling the agent to check what changed first.
+   - Measured on a large-incident set where the decisive line is hidden from the prompt: agent 81% vs single-shot 33%. On the main set: 90% vs 91%.
+6. **Decision.** Use single-shot when the incident fits in the context window. Use the agent for large incidents, where it pays about 1.7× the latency for a large accuracy gain.
+
+**Likely follow-ups:**
+- *"Isn't find_changes tuned to your synthetic data?"* Partly, yes. Change descriptions arrive as log lines, which flatters a keyword matcher. In production this tool would query a real change-event feed (deploy diffs, config history). The finding that the agent must look at changes, not just symptoms, still holds.
+- *"Why three runs?"* Temperature 0 on vLLM is still nondeterministic because of batching. Run-to-run spread was 0.6–1.7 points, about the size of the improvements I was testing.
+- *"What would you do next?"* Collect real public postmortems as an eval slice, compare embedding retrieval against BM25 with a recall@k eval, and pool repositories for the risk model.
+
 ## Likely Interviewer Questions (and Truthful Answers)
 
 **Is the risk score AI-generated?**
